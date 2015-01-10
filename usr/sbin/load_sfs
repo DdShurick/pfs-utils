@@ -1,1 +1,141 @@
-load_pfs
+#!/bin/sh
+#idea jcoder24 20080412
+#modified 20090222
+#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 10.01.2015 for all squasfs module
+# dim-kut add sfs_event
+#--Check modulename
+if [ "$1" = "" ]; then
+	msg_err "Не указан модуль."
+	exit 1
+fi
+#--realpath
+SQMOD=$(realpath $1)
+#--Check free loop ---
+if [ "$(sudo busybox losetup -f)" = "" ]; then
+	msg_err "Модуль не может быть подключен. Нет ни одного свободного устройства обратной связи"
+	exit 1
+fi
+#--Check squashfs
+if [ "$(file -b $SQMOD | grep 'Squashfs filesystem')" = "" ] ; then
+	msg_err "$1 не squashfs."
+	exit 1
+fi
+#--Check squashfs version
+if [ "$(file -b $SQMOD | grep 'version 4.0')" = "" ] ; then
+	msg_err "$1 старая версия squashfs. Перепакуйте."
+	exit 1
+fi
+
+self="Подключить модуль"
+fs_path=$(dirname "$SQMOD") #may need to check
+fs_module=$(basename "$SQMOD" | sed 's/\....$//')
+fs_name=$(basename "$SQMOD")
+#--Check if module loaded or installed--- 
+if [ "$(sudo busybox losetup | grep "\.$fs_module")" != "" ]; then
+	msg_err " $fs_module уже подключен."
+	exit 1
+elif [ "$(ls $HOME/.packages | grep "$fs_module")" != "" ]; then
+	msg_err " $fs_module уже установленен в систему."
+	exit 1
+fi 
+#--- Check args and requirements ---
+if [ ! -f "$SQMOD" ]; then
+	if [ -L "$SQMOD" ]; then
+      	msg_err "Неправильная символическая ссылка!"
+	else
+		msg_err " $fs_module не существует"
+	fi
+	exit 1
+fi
+
+#--- Load squashfs module ---
+#- If Puppy FULL-install-- (Здесь можно добавить ключ -i|--install)
+[ "$PUPMODE" = 3 ] && exec /usr/local/sfs_event/sfs_installer "$SQMOD"
+
+#- If module on removable media (cd) then advise user
+for cdrom in `mount | grep iso9660 | cut -d " " -f3`
+do
+   if [ `echo "$fs_path" | grep -ic $cdrom` -gt 0 ]; then
+      msg="\nsquashfs модуль расположен на компакт-диске. При его загрузке\nвы не сможете использовать привод для других целей до перезапуска ПК. \nВы действительно хотите загрузить его?\n"
+      Xdialog --title "$self" --yesno "$msg"  6 0
+      [ $? -ne 0 ] && exit 0
+      break
+   fi
+done
+
+msg_info "Идет подключение модуля $fs_module..." &
+
+status=0
+mount_point="/mnt/.$fs_module"
+
+[ ! -d "$mount_point" ] && sudo mkdir "$mount_point" 
+echo "Загрузка $fs_module..."
+
+sudo mount -o loop "$SQMOD" "$mount_point"  
+ status=$?
+	
+if [ $status -eq 0 ]; then
+	sudo mount -o remount,append:"$mount_point"=ro / 
+	 status=$?
+
+   if [ $status -gt 0 ]; then
+msg_err "Ошибка! Не union формат файла $1."
+	sudo rmdir "$mount_point"
+	exit 1
+   fi
+else
+	msg_err "Ошибка! Невозможно подключить ${fs_module}${FS}."
+	sudo rmdir "$mount_point"
+	exit 1
+fi
+
+#--- Post-load processes ---
+
+XRESTART=""
+
+if [ -x "$mount_point/.$fs_module" ]; then
+	bash "$mount_point/.$fs_module"
+else
+	#- update ld.conf.so (libraries)
+	if [ ! -z "`which ldconfig`" ]; then
+	 	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
+	 		echo "Обновление library cache /etc/ld.so.cache..."
+	 		ldconfig
+	 	fi
+	fi	
+#- update/refesh menus 	
+	if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ];then
+		fixmenus
+		icewm 
+	fi
+	if [ -f "$mount_point"/start.sh ];then 
+		"$mount_point"/start.sh 
+	fi	 	
+	#- make new kernel modules available, must still be loaded when needed
+	kernel_version="`uname -r`"
+	if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+		echo "Запуск depmod...."
+		depmod
+	fi
+#make new fonts available
+	for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+	do
+		if [ -d "$mount_point/$font_dir" ]; then
+			cd "$font_dir"
+			`which mkfontscale` .
+			`which mkfontdir` .
+		fi		
+	done
+fi
+
+[ -x /usr/local/bin/refreshDesktopIcons ] && /usr/local/bin/refreshDesktopIcons
+# dim-kut ---+DdShurick add--
+if [ -d /usr/local/sfs_event ];then
+ if [ "$(ls /usr/local/sfs_event/sfs_scripts | grep $fs_name)" = "" ]; then 
+/usr/local/sfs_event/sfs_add "$SQMOD"
+ else
+mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
+sed "s/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-${fs_name}/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-${fs_name}/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
+ fi
+fi
+msg_info "Успешно! Модуль $fs_module подключен." &
