@@ -4,12 +4,32 @@
 #DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 10.01.2015 for all squasfs module
 # dim-kut add sfs_event
 #--Check modulename
-if [ "$1" = "" ]; then
-	msg_err "Не указан модуль."
-	exit 1
-fi
+UP="append"
+[ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
+
+case $1 in
+"") exit 1 ;;
+-i|--install)
+[ "$2" ] || exit 1
+ SQMOD=$(realpath $2) || exit 1
+ INST=1
+;;
+-u|--uplevel)
+[ "$2" ] || exit 1
+ SQMOD=$(realpath $2) || exit 1
+ UP="add:1"
+;; 
+*\.???) SQMOD=$(realpath $1) ;;
+*) 
+ exit 1 ;;
+esac
+ echo up
+#if [ "$1" = "" ]; then
+#	msg_err "Не указан модуль."
+#	exit 1
+#fi
 #--realpath
-SQMOD=$(realpath $1)
+#SQMOD=$(realpath $1)
 #--Check free loop ---
 if [ "$(sudo busybox losetup -f)" = "" ]; then
 	msg_err "Модуль не может быть подключен. Нет ни одного свободного устройства обратной связи"
@@ -31,13 +51,14 @@ fs_path=$(dirname "$SQMOD") #may need to check
 fs_module=$(basename "$SQMOD" | sed 's/\....$//')
 fs_name=$(basename "$SQMOD")
 #--Check if module loaded or installed--- 
-if [ "$(sudo busybox losetup | grep "\.$fs_module")" != "" ]; then
+if [ "$(sudo busybox losetup | grep "$fs_module")" != "" ]; then
 	msg_err " $fs_module уже подключен."
 	exit 1
-elif [ "$(ls $HOME/.packages | grep "$fs_module")" != "" ]; then
+elif [ "$(ls -1 /var/lib/packages | grep "$fs_module")" != "" ]; then
 	msg_err " $fs_module уже установленен в систему."
 	exit 1
 fi 
+
 #--- Check args and requirements ---
 if [ ! -f "$SQMOD" ]; then
 	if [ -L "$SQMOD" ]; then
@@ -49,8 +70,8 @@ if [ ! -f "$SQMOD" ]; then
 fi
 
 #--- Load squashfs module ---
-#- If Puppy FULL-install-- (Здесь можно добавить ключ -i|--install)
-[ "$PUPMODE" = 3 ] && exec /usr/local/sfs_event/sfs_installer "$SQMOD"
+#- If Puppy FULL-install-- (DdShurick добавил ключ -i|--install)
+[ "$INST" = 1 ] && exec /usr/sbin/instal_pfs "$SQMOD"
 
 #- If module on removable media (cd) then advise user
 for cdrom in `mount | grep iso9660 | cut -d " " -f3`
@@ -71,11 +92,16 @@ mount_point="/mnt/.$fs_module"
 [ ! -d "$mount_point" ] && sudo mkdir "$mount_point" 
 echo "Загрузка $fs_module..."
 
+if [ "$COPY" = "yes" ]; then
+ cp "$SQMOD" /initrd/mnt/tmpfs/
+ SQMOD=/initrd/mnt/tmpfs/$fs_name
+fi
+
 sudo mount -o loop "$SQMOD" "$mount_point"  
  status=$?
 	
 if [ $status -eq 0 ]; then
-	sudo mount -o remount,append:"$mount_point"=ro / 
+	echo "sudo mount -o remount,"$UP":"$mount_point"=ro / "
 	 status=$?
 
    if [ $status -gt 0 ]; then
