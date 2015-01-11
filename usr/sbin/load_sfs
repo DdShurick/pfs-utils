@@ -23,7 +23,7 @@ case $1 in
 *) 
  exit 1 ;;
 esac
- echo up
+
 #if [ "$1" = "" ]; then
 #	msg_err "Не указан модуль."
 #	exit 1
@@ -87,21 +87,21 @@ done
 msg_info "Идет подключение модуля $fs_module..." &
 
 status=0
-mount_point="/mnt/.$fs_module"
+mount_point="/mnt/live/memory/images/$fs_module"
 
-[ ! -d "$mount_point" ] && sudo mkdir "$mount_point" 
+[ ! -d "$mount_point" ] && sudo mkdir -p "$mount_point" 
 echo "Загрузка $fs_module..."
 
 if [ "$COPY" = "yes" ]; then
- cp "$SQMOD" /initrd/mnt/tmpfs/
- SQMOD=/initrd/mnt/tmpfs/$fs_name
+ cp "$SQMOD" /mnt/live/memory/copy2ram/
+ SQMOD=/mnt/live/memory/copy2ram/$fs_name
 fi
 
 sudo mount -o loop "$SQMOD" "$mount_point"  
  status=$?
 	
 if [ $status -eq 0 ]; then
-	echo "sudo mount -o remount,"$UP":"$mount_point"=ro / "
+	sudo mount -o remount,"$UP":"$mount_point"=ro / 
 	 status=$?
 
    if [ $status -gt 0 ]; then
