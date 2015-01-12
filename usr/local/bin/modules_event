@@ -15,15 +15,16 @@ fi
 LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
 GREP=$(for M in $LIST; do basename $M | tr '\n' '|'; done)
 
-if [ "$(grep $PDEV1 /proc/mounts)" = ""]; then 
+if [ "$(grep $PDEV1 /proc/mounts)" = "" ]; then 
  mkdir -p /mnt/$PDEV1
  sudo mount /dev/$PDEV1 /mnt/$PDEV1
  UMNT=1
 fi
 
+menu () {
 OFFLIST=$(ls -1 $IFDIR/modules $IFDIR/optional | egrep -v "${GREP}^/mnt|^$")
 
-export Window="
+export Menu="
 <hbox>
 	<vbox>
 		<text><label>Подключенные модули</label></text>
@@ -48,8 +49,10 @@ export Window="
 		</hbox>
 	</vbox>
 </hbox>"
-eval $(gtkdialog3 -c --program "Window" --geometry 450x400)
+eval $(gtkdialog3 -c --program "Menu")
 [ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
+}
+menu
 if [  "$EXIT" = "Подключить"  ]; then
  [ "$ON_MODULE" ] || exit
  load_sfs $(find $IFDIR/ -name $ON_MODULE)
@@ -73,7 +76,7 @@ export Repo="<vbox>
   <button cancel></button>
   </hbox>
  </vbox>"
-eval $(gtkdialog3 -c --program "Repo" --geometry 520x450)
+eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
 
 [ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
 GET=$(echo $GET | cut -f1 -d' ')
@@ -88,6 +91,8 @@ GET=$(echo $GET | cut -f1 -d' ')
 	 repo
 	fi
  [ "$GET" = "" ] && exit
- curl ${REPO}${GET} > $IFDIR/optional/$GET_MODULE
+
+ curl ${REPO}${GET} > $IFDIR/optional/$GET
+ menu
 fi
 [ "$UMNT" = 1 ] && sudo umount /mnt/$PDEV1 && sudo rmdir /mnt/$PDEV1
