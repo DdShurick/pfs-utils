@@ -4,6 +4,7 @@
 if [ -f /var/log/*-livedbg ]; then
  eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/1:/IFDEV=/;s/2:/IFDIR=/')
  REPO="http://mirror.yandex.ru/puppyrus/puppyrus-a/pra02/pfs/"
+ PDEV1=$(basename $IFDEV)
 elif [ -f /etc/rc.d/PUPSTATE ]; then
  eval $(egrep 'PSUBDIR|PDEV1' /etc/rc.d/PUPSTATE)
  IFDIR=/mnt/${PDEV1}${PSUBDIR}
@@ -63,19 +64,19 @@ if [  "$EXIT" = "Отключить"  ]; then
 fi
 if [ "$EXIT" = "Скачать" ]; then
 repo () {
-curl $REPO | awk -F [\<\>] '!/Index/ {print "<item>"$3" "$5"</item>"}' > /tmp/repolist
+curl $REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
 export Repo="<vbox>
-  <text><label>Репозиторий модулей</label></text>
-  <list>
-   <variable>GET</variable>
-   $(cat /tmp/repolist)
-  </list>
-  <hbox>
-  $1
-  <button><label>Скачать</label></button>
-  <button cancel></button>
-  </hbox>
- </vbox>"
+	<text><label>Репозиторий модулей</label></text>
+		<list>
+			<variable>GET</variable>
+			<input file>/tmp/repolist</input>
+		</list>
+	<hbox>
+		$1
+		<button><label>Скачать</label></button>
+		<button cancel></button>
+	</hbox>
+</vbox>"
 eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
 
 [ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
@@ -92,7 +93,7 @@ GET=$(echo $GET | cut -f1 -d' ')
 	fi
  [ "$GET" = "" ] && exit
 
- curl ${REPO}${GET} > $IFDIR/optional/$GET
+ wget ${REPO}${GET} -o $IFDIR/optional/
  menu
 fi
 [ "$UMNT" = 1 ] && sudo umount /mnt/$PDEV1 && sudo rmdir /mnt/$PDEV1
