@@ -25,9 +25,11 @@ fi
 menu () {
 OFFLIST=$(ls -1 $IFDIR/modules $IFDIR/optional | egrep -v "${GREP}^/mnt|^$")
 
-export Menu="
-<hbox>
-	<vbox>
+export Menu="<window title=\"Modules_event\">
+<vbox>
+	<text><label>Подключениые, отключение, поиск модулей в сети.</label></text>
+  <hbox>
+	<vbox scrollable=\"true\" height=\"420\">
 		<text><label>Подключенные модули</label></text>
 		<list>
 			<variable>OFF_MODULE</variable>
@@ -37,7 +39,7 @@ export Menu="
 		<button><label>Отключить</label></button>
 		</hbox>
 	</vbox>
-	<vbox>
+	<vbox scrollable=\"true\" height=\"420\">
 		<text><label>Неподключенные модули</label></text>
 		<list>
 			<variable>ON_MODULE</variable>
@@ -49,8 +51,9 @@ export Menu="
 		<button cancel></button>
 		</hbox>
 	</vbox>
-</hbox>"
-eval $(gtkdialog3 -c --program "Menu")
+  </hbox>
+</vbox></window>"
+eval $(gtkdialog3 -c --program="Menu" --geometry="640x480")
 [ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
 }
 menu
