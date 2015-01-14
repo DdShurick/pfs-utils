@@ -23,9 +23,14 @@ BUTTON="<button><label>Показать все подключенные</label><
 
 menu () {
 LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
-GREP=$(for M in $LIST; do basename $M | tr '\n' '|'; done)
+ONLIST=$(for M in $LIST; do basename $M; done)
+GREP=$(for M in $ONLIST; do echo $M | tr '\n' '|'; done)
+[ "$1" = "--all" ] || ONLIST=$(for M in $LIST; do M=$(echo $M | egrep 'live|optional|tmp') && basename $M; done)
 OFFLIST=$(ls -1 $IFDIR/modules $IFDIR/optional | egrep -v "${GREP}^/mnt|^$")
-[ "$1" != "--all" ] && LIST=$(awk '/memory/ {print $2}' /proc/mounts)
+
+echo "$ONLIST" > /tmp/onlist
+echo "$OFFLIST" > /tmp/offlist
+
 export Menu="<window title=\"Modules_event\">
 <vbox>
 	<text><label>Подключениые, отключение, поиск модулей в сети.</label></text>
@@ -34,7 +39,7 @@ export Menu="<window title=\"Modules_event\">
 		<text><label>Подключенные модули</label></text>
 		<list>
 			<variable>OFF_MODULE</variable>
-			$(for M in $LIST; do basename $M | sed 's/^/<item>/;s/$/<\/item>/'; done)
+			<input file>/tmp/onlist</input>
 		</list>
 		<hbox>
 		$BUTTON
@@ -45,7 +50,7 @@ export Menu="<window title=\"Modules_event\">
 		<text><label>Неподключенные модули</label></text>
 		<list>
 			<variable>ON_MODULE</variable>
-			$(for OFF in $OFFLIST; do echo $OFF | sed 's/^/<item>/;s/$/<\/item>/'; done)
+			<input file>/tmp/offlist</input>
 		</list>
 		<hbox>
 		<button><label>Подключить</label></button>
