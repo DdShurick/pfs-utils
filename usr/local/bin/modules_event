@@ -19,7 +19,7 @@ if [ "$(grep $PDEV1 /proc/mounts)" = "" ]; then
  UMNT=1
 fi
 
-BUTTON="<button><label>Показать все подключенные</label></button>"
+BUTTON="<button><label>Показывать автоподключенные</label></button>"
 
 menu () {
 LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
@@ -43,7 +43,10 @@ export Menu="<window title=\"Modules_event\">
 		</list>
 		<hbox>
 		$BUTTON
-		<button><label>Отключить</label></button>
+		<button>
+			<input file stock=\"gtk-remove\"></input>
+			<label>Отключить</label>
+		</button>
 		</hbox>
 	</vbox>
 	<vbox scrollable=\"true\" height=\"440\">
@@ -53,9 +56,18 @@ export Menu="<window title=\"Modules_event\">
 			<input file>/tmp/offlist</input>
 		</list>
 		<hbox>
-		<button><label>Подключить</label></button>
-		<button><label>Скачать</label></button>
-		<button cancel></button>
+		<button>
+			<input file stock=\"gtk-add\"></input>
+			<label>Подключить</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-network\"></input>
+			<label>Скачать</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-quit\"></input>
+			<label>Выйти</label>
+		</button>
 		</hbox>
 	</vbox>
   </hbox>
@@ -63,12 +75,12 @@ export Menu="<window title=\"Modules_event\">
 eval $(gtkdialog3 -c --program="Menu" --geometry="640x480")
 [ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
 
-if [  "$EXIT" = "Показать все подключенные" ]; then
- BUTTON="<button><label>Убрать</label></button>"
+if [  "$EXIT" = "Показывать автоподключенные" ]; then
+ BUTTON="<button><label>Не показывать автоподключенные</label></button>"
  menu --all
 fi
-if [  "$EXIT" = "Убрать" ]; then
- BUTTON="<button><label>Показать все подключенные</label></button>"
+if [  "$EXIT" = "Не показывать автоподключенные" ]; then
+ BUTTON="<button><label>Показывать автоподключенные</label></button>"
  menu
 fi
 }
@@ -92,14 +104,23 @@ export Repo="<vbox>
 			<input file>/tmp/repolist</input>
 		</list>
 	<hbox>
-		<button><label>Назад</label></button>
-		<button><label>Скачать</label></button>
-		<button cancel></button>
+		<button>
+			<input file stock=\"gtk-go-back\"></input>
+			<label>Назад</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-go-forward\"></input>
+			<label>Вперёд</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-quit\"></input>
+			<label>Выйти</label>
+		</button>
 	</hbox>
 </vbox>"
 eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
 
-[ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
+[ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
 
 GET=$(echo $GET | cut -f1 -d' ')
 
