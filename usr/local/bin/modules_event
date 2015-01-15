@@ -19,7 +19,7 @@ if [ "$(grep $PDEV1 /proc/mounts)" = "" ]; then
  UMNT=1
 fi
 
-BUTTON="<button><label>Показывать автоподключенные</label></button>"
+BUTTON="<button><label>С автоподключенными</label></button>"
 
 menu () {
 LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
@@ -73,30 +73,32 @@ export Menu="<window title=\"Modules_event\">
   </hbox>
 </vbox></window>"
 eval $(gtkdialog3 -c --program="Menu" --geometry="640x480")
-[ "$EXIT" = "Cancel" -o  "$EXIT" = "abort" ] && exit
+[ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
 
-if [  "$EXIT" = "Показывать автоподключенные" ]; then
- BUTTON="<button><label>Не показывать автоподключенные</label></button>"
+if [  "$EXIT" = "С автоподключенными" ]; then
+ BUTTON="<button><label>Без автоподключенных</label></button>"
  menu --all
 fi
-if [  "$EXIT" = "Не показывать автоподключенные" ]; then
- BUTTON="<button><label>Показывать автоподключенные</label></button>"
+if [  "$EXIT" = "Без автоподключенных" ]; then
+ BUTTON="<button><label>С автоподключенными</label></button>"
  menu
 fi
 }
 menu
 if [  "$EXIT" = "Подключить" ]; then
- [ "$ON_MODULE" ] && load_sfs $(find $IFDIR/ -name $ON_MODULE)
+ [ "$ON_MODULE" ] && load_sfs $(find $IFDIR/ -name $ON_MODULE) || ntf -e "Ничего не выбрано"
 fi
 if [  "$EXIT" = "Отключить" ]; then
- [ "$OFF_MODULE" ] && unload_sfs $(echo "$LIST" | grep $OFF_MODULE)
+ [ "$OFF_MODULE" ] && unload_sfs $(echo "$LIST" | grep $OFF_MODULE) || ntf -e "Ничего не выбрано"
 fi
 if [ "$EXIT" = "Скачать" ]; then
 
+ping -c 1 ya.ru || ntf -e "Интернет недоступен"
 repo () {
-msg_info "Загрузка данных. Ждите..." &
+ntf "Загрузка данных. Ждите..." &
 
 curl $REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
+
 export Repo="<vbox>
 	<text><label>Репозиторий модулей</label></text>
 		<list>
@@ -134,8 +136,11 @@ GET=$(echo $GET | cut -f1 -d' ')
 	fi
 }
  repo
- [ "$GET" = "" ] && exit
- wget -c ${REPO}${GET} -O $IFDIR/optional/${GET} || msg_err wget_error
- menu
+	if [ "$GET" = "" ]; then
+	 ntf -e "Ничего не выбрано"
+	 exit
+	fi
+ wget -c ${REPO}${GET} -O $IFDIR/optional/${GET}
 fi
+
 [ "$UMNT" = 1 ] && sudo umount /mnt/$PDEV1 && sudo rmdir /mnt/$PDEV1
