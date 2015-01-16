@@ -1,5 +1,5 @@
 #!/bin/sh
-#DdShurick 12.01.15 GPL v2 modifited for Richy and PRA
+#DdShurick 16.01.15 GPL v2 modifited for Richy and PRA
 
 if [ -f /var/log/*-livedbg ]; then
  eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/1:/IFDEV=/;s/2:/IFDIR=/')
@@ -19,13 +19,56 @@ if [ "$(grep $PDEV1 /proc/mounts)" = "" ]; then
  UMNT=1
 fi
 
+repo () {
+ntf "Загрузка данных. Ждите..." &
+
+curl $REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
+
+export Repo="<vbox>
+	<text><label>Репозиторий модулей</label></text>
+		<list>
+			<variable>GET</variable>
+			<input file>/tmp/repolist</input>
+		</list>
+	<hbox>
+		<button>
+			<input file stock=\"gtk-go-back\"></input>
+			<label>Назад</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-go-forward\"></input>
+			<label>Вперёд</label>
+		</button>
+		<button>
+			<input file stock=\"gtk-quit\"></input>
+			<label>Выйти</label>
+		</button>
+	</hbox>
+</vbox>"
+eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
+
+[ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
+
+GET=$(echo $GET | cut -f1 -d' ')
+
+	if [ "$(echo $GET | grep '/$')" ]; then
+	 REPO=${REPO}${GET}
+	 repo 
+	fi
+	if [ "$EXIT" = "Назад" ]; then
+	 REPO=$(dirname $REPO)/
+	 repo
+	fi
+}
+
 BUTTON="<button><label>С автоподключенными</label></button>"
 
 menu () {
-LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
+#LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
+LIST=$(sudo busybox losetup | awk '!/base/ {print $3}')
 ONLIST=$(for M in $LIST; do basename $M; done)
 GREP=$(for M in $ONLIST; do echo $M | tr '\n' '|'; done)
-[ "$1" = "--all" ] || ONLIST=$(for M in $LIST; do M=$(echo $M | egrep 'live|optional|tmp') && basename $M; done)
+[ "$1" = "--all" ] || ONLIST=$(for M in $LIST; do M=$(echo $M | egrep 'live|optional|tmp/') && basename $M; done)
 OFFLIST=$(ls -1 $IFDIR/modules $IFDIR/optional | egrep -v "${GREP}^/mnt|^$")
 
 echo "$ONLIST" > /tmp/onlist
@@ -83,6 +126,19 @@ if [  "$EXIT" = "Без автоподключенных" ]; then
  BUTTON="<button><label>С автоподключенными</label></button>"
  menu
 fi
+if [ "$EXIT" = "Скачать" ]; then
+	if [ "$(ping -c 1 ya.ru)" ]; then
+	 repo
+		if [ "$GET" = "" ]; then
+		 ntf -e "Ничего не выбрано"
+		 exit
+		fi
+	 wget -c ${REPO}${GET} -O $IFDIR/optional/${GET}
+	else
+	 ntf -e "Интернет недоступен"
+	fi 
+ menu
+fi
 }
 menu
 if [  "$EXIT" = "Подключить" ]; then
@@ -90,57 +146,6 @@ if [  "$EXIT" = "Подключить" ]; then
 fi
 if [  "$EXIT" = "Отключить" ]; then
  [ "$OFF_MODULE" ] && unload_sfs $(echo "$LIST" | grep $OFF_MODULE) || ntf -e "Ничего не выбрано"
-fi
-if [ "$EXIT" = "Скачать" ]; then
-
-ping -c 1 ya.ru || ntf -e "Интернет недоступен"
-repo () {
-ntf "Загрузка данных. Ждите..." &
-
-curl $REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
-
-export Repo="<vbox>
-	<text><label>Репозиторий модулей</label></text>
-		<list>
-			<variable>GET</variable>
-			<input file>/tmp/repolist</input>
-		</list>
-	<hbox>
-		<button>
-			<input file stock=\"gtk-go-back\"></input>
-			<label>Назад</label>
-		</button>
-		<button>
-			<input file stock=\"gtk-go-forward\"></input>
-			<label>Вперёд</label>
-		</button>
-		<button>
-			<input file stock=\"gtk-quit\"></input>
-			<label>Выйти</label>
-		</button>
-	</hbox>
-</vbox>"
-eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
-
-[ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
-
-GET=$(echo $GET | cut -f1 -d' ')
-
-	if [ "$(echo $GET | grep '/$')" ]; then
-	 REPO=${REPO}${GET}
-	 repo 
-	fi
-	if [ "$EXIT" = "Назад" ]; then
-	 REPO=$(dirname $REPO)/
-	 repo
-	fi
-}
- repo
-	if [ "$GET" = "" ]; then
-	 ntf -e "Ничего не выбрано"
-	 exit
-	fi
- wget -c ${REPO}${GET} -O $IFDIR/optional/${GET}
 fi
 
 [ "$UMNT" = 1 ] && sudo umount /mnt/$PDEV1 && sudo rmdir /mnt/$PDEV1

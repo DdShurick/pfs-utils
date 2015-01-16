@@ -24,12 +24,6 @@ case $1 in
  exit 1 ;;
 esac
 
-#if [ "$1" = "" ]; then
-#	msg_err "Не указан модуль."
-#	exit 1
-#fi
-#--realpath
-#SQMOD=$(realpath $1)
 #--Check free loop ---
 if [ "$(sudo busybox losetup -f)" = "" ]; then
 	msg_err "Модуль не может быть подключен. Нет ни одного свободного устройства обратной связи"
