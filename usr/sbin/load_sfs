@@ -26,17 +26,18 @@ esac
 
 #--Check free loop ---
 if [ "$(sudo busybox losetup -f)" = "" ]; then
-	msg_err "Модуль не может быть подключен. Нет ни одного свободного устройства обратной связи"
+	ntf -e "Модуль не может быть подключен.
+	 Нет ни одного свободного устройства обратной связи"
 	exit 1
 fi
 #--Check squashfs
 if [ "$(file -b $SQMOD | grep 'Squashfs filesystem')" = "" ] ; then
-	msg_err "$1 не squashfs."
+	ntf -e "$1 не squashfs."
 	exit 1
 fi
 #--Check squashfs version
 if [ "$(file -b $SQMOD | grep 'version 4.0')" = "" ] ; then
-	msg_err "$1 старая версия squashfs. Перепакуйте."
+	ntf -e "$1 старая версия squashfs. Перепакуйте."
 	exit 1
 fi
 
@@ -46,19 +47,19 @@ fs_module=$(basename "$SQMOD" | sed 's/\....$//')
 fs_name=$(basename "$SQMOD")
 #--Check if module loaded or installed--- 
 if [ "$(sudo busybox losetup | grep "$fs_module")" != "" ]; then
-	msg_err " $fs_module уже подключен."
+	ntf -e " $fs_module уже подключен."
 	exit 1
 elif [ "$(ls -1 /var/lib/packages | grep "$fs_module")" != "" ]; then
-	msg_err " $fs_module уже установленен в систему."
+	ntf -e " $fs_module уже установленен в систему."
 	exit 1
 fi 
 
 #--- Check args and requirements ---
 if [ ! -f "$SQMOD" ]; then
 	if [ -L "$SQMOD" ]; then
-      	msg_err "Неправильная символическая ссылка!"
+      	ntf -e "Неправильная символическая ссылка!"
 	else
-		msg_err " $fs_module не существует"
+		ntf -e " $fs_module не существует"
 	fi
 	exit 1
 fi
@@ -78,7 +79,7 @@ do
    fi
 done
 
-msg_info "Идет подключение модуля $fs_module..." &
+ntf -i "Идет подключение модуля $fs_module..." &
 
 status=0
 mount_point="/mnt/live/memory/images/$fs_module"
@@ -99,12 +100,12 @@ if [ $status -eq 0 ]; then
 	 status=$?
 
    if [ $status -gt 0 ]; then
-msg_err "Ошибка! Не union формат файла $1."
+ntf -e "Ошибка! Не union формат файла $1."
 	sudo rmdir "$mount_point"
 	exit 1
    fi
 else
-	msg_err "Ошибка! Невозможно подключить ${fs_module}${FS}."
+	ntf -e "Ошибка! Невозможно подключить ${fs_module}${FS}."
 	sudo rmdir "$mount_point"
 	exit 1
 fi
@@ -158,4 +159,4 @@ mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
 sed "s/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-${fs_name}/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-${fs_name}/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-msg_info "Успешно! Модуль $fs_module подключен." &
+ntf -i "Успешно! Модуль $fs_module подключен." &

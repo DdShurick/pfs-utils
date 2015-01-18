@@ -1,14 +1,14 @@
 #!/bin/sh
 #DdShurick 16.01.15 GPL v2 modifited for Richy and PRA
-
+[ "$(whoami)" = root ] || sudo=sudo
 if [ -f /var/log/*-livedbg ]; then
  eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/1:/IFDEV=/;s/2:/IFDIR=/')
- REPO="http://mirror.yandex.ru/puppyrus/puppyrus-a/pra02/pfs/"
+ DISTRO_REPO="`awk -F"/iso/" '{print $1}' /etc/pra`/pfs/" ###sfs
  PDEV1=$(basename $IFDEV)
 elif [ -f /etc/rc.d/PUPSTATE ]; then
  eval $(egrep 'PSUBDIR|PDEV1' /etc/rc.d/PUPSTATE)
  IFDIR=/mnt/${PDEV1}${PSUBDIR}
- REPO="http://mirror.yandex.ru/puppyrus/puppyrus/repository/"
+ eval $(grep DISTRO_REPO /etc/DISTRO_SPECS) #repository in DISTRO_SPECS
 else
  exit 1
 fi
@@ -22,7 +22,7 @@ fi
 repo () {
 ntf "Загрузка данных. Ждите..." &
 
-curl $REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
+curl $DISTRO_REPO | awk -F [\<\>] '!/Index/ {print $3 $5}' | grep ".." > /tmp/repolist
 
 export Repo="<vbox>
 	<text><label>Репозиторий модулей</label></text>
@@ -52,27 +52,46 @@ eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
 GET=$(echo $GET | cut -f1 -d' ')
 
 	if [ "$(echo $GET | grep '/$')" ]; then
-	 REPO=${REPO}${GET}
+	 DISTRO_REPO=${DISTRO_REPO}${GET}
 	 repo 
 	fi
 	if [ "$EXIT" = "Назад" ]; then
-	 REPO=$(dirname $REPO)/
+	 DISTRO_REPO=$(dirname $DISTRO_REPO)/
 	 repo
 	fi
 }
 
-BUTTON="<button><label>С автоподключенными</label></button>"
-
+BUTTON_A="<button><label>С автоподключенными</label></button>"
+#if no "$DISTRO_REPO" - no button "Скачать"
+[ "$DISTRO_REPO" ] && BUTTON_B="<button>
+			<input file stock=\"gtk-network\"></input>
+			<label>Скачать</label>
+		</button>"
+BUTTON_C="<button>
+			<input file stock=\"gtk-remove\"></input>
+			<label>Отключить</label>
+		</button>"
 menu () {
-#LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
-LIST=$(sudo busybox losetup | awk '!/base/ {print $3}')
-ONLIST=$(for M in $LIST; do basename $M; done)
-GREP=$(for M in $ONLIST; do echo $M | tr '\n' '|'; done)
-[ "$1" = "--all" ] || ONLIST=$(for M in $LIST; do M=$(echo $M | egrep 'live|optional|tmp/') && basename $M; done)
-OFFLIST=$(ls -1 $IFDIR/modules $IFDIR/optional | egrep -v "${GREP}^/mnt|^$")
+LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
 
-echo "$ONLIST" > /tmp/onlist
-echo "$OFFLIST" > /tmp/offlist
+: > /tmp/onlist
+: > /tmp/allonlist
+: > /tmp/offlist
+
+ for M in $LIST
+ do
+  [ "$(ls /mnt/*$(basename $M))" ] && continue
+  basename $M >> /tmp/allonlist
+  basename $(echo $M | egrep 'live|optional|tmp/') >> /tmp/onlist
+ done
+GREP=$(cat /tmp/allonlist | tr '\n' '|')
+[ "$1" = "--all" ] && pref=all || pref=''
+
+find $IFDIR/modules $IFDIR/optional ! -type d | egrep -v "${GREP}^$" | while read M
+ do
+  [ "$(file $M | grep 'Squashfs filesystem, little endian, version 4')" = "" ] && continue
+  basename $M >> /tmp/offlist
+ done
 
 export Menu="<window title=\"Modules_event\">
 <vbox>
@@ -82,14 +101,11 @@ export Menu="<window title=\"Modules_event\">
 		<text><label>Подключенные модули</label></text>
 		<list>
 			<variable>OFF_MODULE</variable>
-			<input file>/tmp/onlist</input>
+			<input file>/tmp/${pref}onlist</input>
 		</list>
 		<hbox>
-		$BUTTON
-		<button>
-			<input file stock=\"gtk-remove\"></input>
-			<label>Отключить</label>
-		</button>
+		$BUTTON_A
+		$BUTTON_C
 		</hbox>
 	</vbox>
 	<vbox scrollable=\"true\" height=\"440\">
@@ -103,10 +119,7 @@ export Menu="<window title=\"Modules_event\">
 			<input file stock=\"gtk-add\"></input>
 			<label>Подключить</label>
 		</button>
-		<button>
-			<input file stock=\"gtk-network\"></input>
-			<label>Скачать</label>
-		</button>
+		$BUTTON_B
 		<button>
 			<input file stock=\"gtk-quit\"></input>
 			<label>Выйти</label>
@@ -119,11 +132,16 @@ eval $(gtkdialog3 -c --program="Menu" --geometry="640x480")
 [ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
 
 if [  "$EXIT" = "С автоподключенными" ]; then
- BUTTON="<button><label>Без автоподключенных</label></button>"
+ BUTTON_A="<button><label>Без автоподключенных</label></button>"
+ BUTTON_C=''
  menu --all
 fi
 if [  "$EXIT" = "Без автоподключенных" ]; then
- BUTTON="<button><label>С автоподключенными</label></button>"
+ BUTTON_A="<button><label>С автоподключенными</label></button>"
+ BUTTON_C="<button>
+			<input file stock=\"gtk-remove\"></input>
+			<label>Отключить</label>
+		</button>"
  menu
 fi
 if [ "$EXIT" = "Скачать" ]; then
@@ -133,7 +151,7 @@ if [ "$EXIT" = "Скачать" ]; then
 		 ntf -e "Ничего не выбрано"
 		 exit
 		fi
-	 wget -c ${REPO}${GET} -O $IFDIR/optional/${GET}
+	 $sudo wget -c ${DISTRO_REPO}${GET} -O $IFDIR/optional/${GET}
 	else
 	 ntf -e "Интернет недоступен"
 	fi 

@@ -7,19 +7,19 @@ self="Отключить модуль"
 if [ "$1" = "" ]; then echo "Не указан модуль."
 exit 1
 fi
-fs_module=$(basename "$1")
-mount_point="/mnt/live/memory/images/$fs_module" #<-- здесь
-if [ ! -d "$mount_point" ]; then
-xpupsay "$fs_module не был подключен."
+fs_module=$(basename "$1" | sed 's/\....//')
+mount_point="/mnt/live/memory/images/$fs_module"
+if [ "$(sudo busybox losetup | grep "$fs_module")" = "" ]; then
+ntf -e "$fs_module не был подключен."
 exit 1
 fi
 #--- Останавливаем программу перед отмонтированием---
 if [ -f "$mount_point"/stop.sh ];then 
 "$mount_point"/stop.sh
 fi
-find $mount_point/ -type f -executable | while read P
+find $mount_point/ -type f | while read P
 do
-Ppid="$(pidof $(basename $P))" || continue 
+[ -x $P ] && Ppid="$(pidof $(basename $P))" || continue 
 kill $Ppid
 done
 #--- Check args and requirements ---
@@ -27,20 +27,17 @@ if [ "$(file "$1" | grep "Squashfs filesystem")" = "" ] ; then
    echo "$1 не squashfs."
    exit 1
 else
-   if [ `echo $1 | grep -ice ".${FS}$"` -ne 1 ]; then
-      echo "Usage: $self file$FS"
-      exit 1
-   elif [ ! -f "$1" ]; then
+   if [ ! -f "$1" ]; then
       if [ -L "$1" ]; then
-      	echo "Symbolic Link target not found!"
+      	echo "Неправильная символическая ссылка!"
       else
-      	echo "File not found!"
+      	echo "$fs_module не существует!"
       fi
       exit 1
    fi
 fi
 
-xpupsay "Идет отключение модуля $fs_module" &
+ntf -i "Идет отключение модуля $fs_module" &
 
 sudo mount -o remount,del:"$mount_point"/ /
 
@@ -103,4 +100,4 @@ mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
 sed "s/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-$fs_module/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-$fs_module/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-xpupsay "Успешно! Модуль $fs_module отключен." &
+ntf -i "Успешно! Модуль $fs_module отключен." &
