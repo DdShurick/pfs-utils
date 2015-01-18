@@ -1,0 +1,10 @@
+#!/bin/sh
+# DdShurick GPL v001 18.01.15 for PRA
+[ "$(whoami)" != "root" ] && exec sudo -A ${0} ${@}
+eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/^1:/IFDEV=/;s/^2:/IFDIR=/')
+[ -d /tmp/savepfs-root ] && rm -r /tmp/savepfs-root/* || mkdir /tmp/savepfs-root
+[ -d /mnt/live/memory/images/090-save.pfs ] && cp -a /mnt/live/memory/images/090-save.pfs/* /tmp/savepfs-root/
+cp -a $(ls -d /mnt/live/memory/changes/[!dimstv]*) /tmp/savepfs-root/
+[ -f $IFDIR/base/090-save.pfs ] && mv $IFDIR/base/090-save.pfs $IFDIR/base/090-save.pfs~
+mksquashfs /tmp/savepfs-root/ $IFDIR/base/090-save.pfs -comp xz
+ntf -i "Сохранено"
