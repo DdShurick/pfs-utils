@@ -1,0 +1,12 @@
+#!/bin/sh
+# DdShurick GPL v004 060614 for Richy
+[ "$(whoami)" = "root" ] || exec loginroot
+
+mkdir -p /tmp/savesfs-root
+SAVEPATH=$(dirname $(head -n 1 /initrd/tmp/PUPPYFILES)) 2>/dev/null && 
+[ "$(grep "pup_ro1 " /proc/mounts)" ] && cp -a /initrd/pup_ro1/* /tmp/savesfs-root/
+cp -a $(ls -d /initrd/pup_rw/[!dimstv]*) /tmp/savesfs-root/
+echo false > /tmp/savesfs-root/etc/.XLOADED
+rm -r /tmp/savesfs-root/etc/Desktop/*
+mksquashfs /tmp/savesfs-root/ /tmp/Richy-save.sfs -comp xz
+mv -f /tmp/Richy-save.sfs /initrd$SAVEPATH/Richy-save.sfs
