@@ -1,5 +1,5 @@
 #!/bin/sh
-#DdShurick 16.01.15 GPL v2 modifited for Richy and PRA
+#DdShurick 25.01.15 GPL v2 modifited for Richy and PRA
 [ "$(whoami)" = root ] || sudo=sudo
 if [ -f /var/log/*-livedbg ]; then
  eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/1:/IFDEV=/;s/2:/IFDIR=/')
@@ -7,15 +7,16 @@ if [ -f /var/log/*-livedbg ]; then
  PDEV1=$(basename $IFDEV)
 elif [ -f /etc/rc.d/PUPSTATE ]; then
  eval $(egrep 'PSUBDIR|PDEV1' /etc/rc.d/PUPSTATE)
- IFDIR=/mnt/${PDEV1}${PSUBDIR}
+ IFDIR=$(grep $PDEV1 /proc/mounts | awk '{print $2}')${PSUBDIR}
  eval $(grep DISTRO_REPO /etc/DISTRO_SPECS) #repository in DISTRO_SPECS
 else
  exit 1
 fi
 
-if [ "$(grep $PDEV1 /proc/mounts)" = "" ]; then 
+if [ "$IFDIR" = "$PSUBDIR" ]; then 
  mkdir -p /mnt/$PDEV1
  sudo mount /dev/$PDEV1 /mnt/$PDEV1
+ IFDIR=/mnt/${PDEV1}${PSUBDIR}
  UMNT=1
 fi
 
