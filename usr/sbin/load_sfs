@@ -1,9 +1,10 @@
 #!/bin/sh
 #idea jcoder24 20080412
 #modified 20090222
-#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 10.01.2015 for all squasfs module
+#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module
 # dim-kut add sfs_event
 #--Check modulename
+[ $(whoami) = root ] || sudo=sudo
 UP="append"
 [ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
 
@@ -25,7 +26,7 @@ case $1 in
 esac
 
 #--Check free loop ---
-if [ "$(sudo busybox losetup -f)" = "" ]; then
+if [ "$($sudo busybox losetup -f)" = "" ]; then
 	ntf -e "Модуль не может быть подключен.
 	 Нет ни одного свободного устройства обратной связи"
 	exit 1
@@ -46,7 +47,7 @@ fs_path=$(dirname "$SQMOD") #may need to check
 fs_module=$(basename "$SQMOD" | sed 's/\....$//')
 fs_name=$(basename "$SQMOD")
 #--Check if module loaded or installed--- 
-if [ "$(sudo busybox losetup | grep "$fs_module")" != "" ]; then
+if [ "$($sudo busybox losetup | grep "$fs_module")" != "" ]; then
 	ntf -e " $fs_module уже подключен."
 	exit 1
 elif [ "$(ls -1 /var/lib/packages | grep "$fs_module")" != "" ]; then
@@ -84,7 +85,7 @@ ntf -i "Идет подключение модуля $fs_module..." &
 status=0
 mount_point="/mnt/live/memory/images/$fs_module"
 
-[ ! -d "$mount_point" ] && sudo mkdir -p "$mount_point" 
+[ ! -d "$mount_point" ] && $sudo mkdir -p "$mount_point" 
 echo "Загрузка $fs_module..."
 
 if [ "$COPY" = "yes" ]; then
@@ -92,21 +93,21 @@ if [ "$COPY" = "yes" ]; then
  SQMOD=/mnt/live/memory/copy2ram/$fs_name
 fi
 
-sudo mount -o loop "$SQMOD" "$mount_point"  
+$sudo mount -o loop "$SQMOD" "$mount_point"  
  status=$?
 	
 if [ $status -eq 0 ]; then
-	sudo mount -o remount,"$UP":"$mount_point"=ro / 
+	$sudo mount -o remount,"$UP":"$mount_point"=ro / 
 	 status=$?
 
    if [ $status -gt 0 ]; then
 ntf -e "Ошибка! Не union формат файла $1."
-	sudo rmdir "$mount_point"
+	$sudo rmdir "$mount_point"
 	exit 1
    fi
 else
 	ntf -e "Ошибка! Невозможно подключить ${fs_module}${FS}."
-	sudo rmdir "$mount_point"
+	$sudo rmdir "$mount_point"
 	exit 1
 fi
 

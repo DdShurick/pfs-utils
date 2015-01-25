@@ -15,7 +15,7 @@ fi
 
 if [ "$IFDIR" = "$PSUBDIR" ]; then 
  mkdir -p /mnt/$PDEV1
- sudo mount /dev/$PDEV1 /mnt/$PDEV1
+ $sudo mount /dev/$PDEV1 /mnt/$PDEV1
  IFDIR=/mnt/${PDEV1}${PSUBDIR}
  UMNT=1
 fi
@@ -73,7 +73,7 @@ BUTTON_C="<button>
 			<label>Отключить</label>
 		</button>"
 menu () {
-LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
+LIST=$($sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
 
 : > /tmp/onlist
 : > /tmp/allonlist
@@ -81,14 +81,13 @@ LIST=$(sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print 
 
  for M in $LIST
  do
-  [ "$(ls /mnt/*$(basename $M))" ] && continue
   basename $M >> /tmp/allonlist
-  basename $(echo $M | egrep 'live|optional|tmp/') >> /tmp/onlist
+  [ $(echo $M | egrep 'memory|initrd') ] && basename $M >> /tmp/onlist
  done
 GREP=$(cat /tmp/allonlist | tr '\n' '|')
 [ "$1" = "--all" ] && pref=all || pref=''
 
-find $IFDIR/modules $IFDIR/optional ! -type d | egrep -v "${GREP}^$" | while read M
+find $IFDIR/modules $IFDIR/optional -maxdepth 1 ! -type d | egrep -v "${GREP}^$" | while read M
  do
   [ "$(file $M | grep 'Squashfs filesystem, little endian, version 4')" = "" ] && continue
   basename $M >> /tmp/offlist
@@ -167,4 +166,4 @@ if [  "$EXIT" = "Отключить" ]; then
  [ "$OFF_MODULE" ] && unload_sfs $(echo "$LIST" | grep $OFF_MODULE) || ntf -e "Ничего не выбрано"
 fi
 
-[ "$UMNT" = 1 ] && sudo umount /mnt/$PDEV1 && sudo rmdir /mnt/$PDEV1
+[ "$UMNT" = 1 ] && $sudo umount /mnt/$PDEV1 && $sudo rmdir /mnt/$PDEV1

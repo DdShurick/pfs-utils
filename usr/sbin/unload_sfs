@@ -1,26 +1,26 @@
 #!/bin/bash
 #idea jcoder24 20080412
 #modified 20090222
-#DdShurick modified 20100924 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 15.01.2015 for all squasfs module
-#
+#DdShurick modified 20100924 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module
+[ $(whoami) = root ] || sudo=sudo
 self="Отключить модуль"
 if [ "$1" = "" ]; then echo "Не указан модуль."
-exit 1
+ exit 1
 fi
-fs_module=$(basename "$1" | sed 's/\....//')
+fs_module=$(basename "$1" | sed 's/\.[psx][fz][ms]//')
 mount_point="/mnt/live/memory/images/$fs_module"
-if [ "$(sudo busybox losetup | grep "$fs_module")" = "" ]; then
-ntf -e "$fs_module не был подключен."
-exit 1
+if [ "$($sudo busybox losetup | grep "$fs_module")" = "" ]; then
+ ntf -e "$fs_module не был подключен."
+ exit 1
 fi
 #--- Останавливаем программу перед отмонтированием---
 if [ -f "$mount_point"/stop.sh ];then 
-"$mount_point"/stop.sh
+ "$mount_point"/stop.sh
 fi
 find $mount_point/ -type f | while read P
 do
-[ -x $P ] && Ppid="$(pidof $(basename $P))" || continue 
-kill $Ppid
+ [ -x $P ] && Ppid="$(pidof $(basename $P))" || continue 
+ kill $Ppid
 done
 #--- Check args and requirements ---
 if [ "$(file "$1" | grep "Squashfs filesystem")" = "" ] ; then
@@ -39,7 +39,7 @@ fi
 
 ntf -i "Идет отключение модуля $fs_module" &
 
-sudo mount -o remount,del:"$mount_point"/ /
+$sudo mount -o remount,del:"$mount_point"/ /
 
 XRESTART=""
 
@@ -75,8 +75,8 @@ XRESTART=""
 		fi
 	done
 
-sudo umount -d "$mount_point" 
-sudo rmdir "$mount_point"
+$sudo umount -d "$mount_point" 
+$sudo rmdir "$mount_point"
 
 [ -x /usr/local/bin/refreshDesktopIcons ] && /usr/local/bin/refreshDesktopIcons
 
