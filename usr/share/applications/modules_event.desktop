@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Modules_event
+Icon=loadsfs
+Comment[ru]=Управление модулями
+Exec=/usr/local/bin/modules_event
+Terminal=false
+Type=Application
+Categories=SFS-Modules
+GenericName=Modules_event

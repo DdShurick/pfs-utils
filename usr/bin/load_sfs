@@ -1,0 +1,166 @@
+#!/bin/sh
+#idea jcoder24 20080412
+#modified 20090222
+#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module
+# dim-kut add sfs_event
+
+ntf () {
+xmessage $2
+}
+
+[ $(whoami) = root ] || sudo=sudo
+UP="append"
+[ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
+
+case $1 in
+"") exit 1 ;;
+#--If Puppy FULL-install-- (DdShurick add -i|--install)
+-i|--install)
+[ "$2" ] || exit 1
+ SQMOD=$(realpath $2) || exit 1
+ [ "$INST" = 1 ] && exec /usr/sbin/instal_pfs "$SQMOD"
+;;
+#to mount the module above the base (DdShurick add -u|--uplevel)
+-u|--uplevel)
+[ "$2" ] || exit 1
+ SQMOD=$(realpath $2) || exit 1
+ UP="add:1"
+;; 
+*\.[ps]fs|*\.xzm) SQMOD=$(realpath $1) ;;
+*) exit 1 ;;
+esac
+
+#--Check free loop ---
+if [ "$($sudo losetup -f)" = "" ]; then
+	ntf -e "Модуль не может быть подключен.
+	 Нет ни одного свободного устройства обратной связи"
+	exit 1
+fi
+#--Check squashfs
+if [ "$(file -b $SQMOD | grep 'Squashfs filesystem')" = "" ] ; then
+	ntf -e "$1 не squashfs."
+	exit 1
+fi
+#--Check squashfs version
+if [ "$(file -b $SQMOD | grep 'version 4.0')" = "" ] ; then
+	ntf -e "$1 старая версия squashfs. Перепакуйте."
+	exit 1
+fi
+
+self="Подключить модуль"
+fs_path=$(dirname "$SQMOD") #may need to check
+fs_module=$(basename "$SQMOD" | sed 's/\....$//')
+fs_name=$(basename "$SQMOD")
+#--Check if module loaded or installed--- 
+if [ "$($sudo losetup -a | grep "$fs_module")" != "" ]; then
+	ntf -e " $fs_module уже подключен."
+	exit 1
+elif [ "$(ls -1 /etc/packages/mount/ | grep "$fs_module")" != "" ]; then
+	ntf -e " $fs_module уже установленен в систему."
+	exit 1
+fi 
+
+#--- Check args and requirements ---
+if [ ! -f "$SQMOD" ]; then
+	if [ -L "$SQMOD" ]; then
+      	ntf -e "Неправильная символическая ссылка!"
+	else
+		ntf -e " $fs_module не существует"
+	fi
+	exit 1
+fi
+
+#--- Load squashfs module ---
+#- If module on removable media (cd) then advise user
+if [ "$COPY" != "yes" ]; then
+	for cdrom in $(awk '/iso9660/ {print $2}' /proc/mounts)
+	do
+	   if [ `echo "$fs_path" | grep -ic $cdrom` -gt 0 ]; then
+	    msg="\nsquashfs модуль расположен на компакт-диске. При его загрузке\nвы не сможете использовать привод для других целей до перезапуска ПК. \nВы действительно хотите загрузить его?\n"
+	    Xdialog --title "$self" --yesno "$msg"  6 0
+      [ $? -ne 0 ] && exit 0
+	    break
+	   fi
+	done
+fi
+ntf -i "Идет подключение модуля $fs_module..." &
+
+status=0
+mount_point="/mnt/live/memory/images/$fs_module"
+
+[ ! -d "$mount_point" ] && $sudo mkdir -p "$mount_point" 
+echo "Загрузка $fs_module..."
+
+if [ "$COPY" = "yes" ]; then
+ cp "$SQMOD" /mnt/live/memory/copy2ram/
+ SQMOD=/mnt/live/memory/copy2ram/$fs_name
+fi
+
+$sudo mount -o loop "$SQMOD" "$mount_point"  
+ status=$?
+	
+if [ $status -eq 0 ]; then
+	$sudo mount -o remount,"$UP":"$mount_point"=ro / 
+	 status=$?
+
+   if [ $status -gt 0 ]; then
+ntf -e "Ошибка! Не union формат файла $1."
+	$sudo rmdir "$mount_point"
+	exit 1
+   fi
+else
+	ntf -e "Ошибка! Невозможно подключить ${fs_module}${FS}."
+	$sudo rmdir "$mount_point"
+	exit 1
+fi
+
+#--- Post-load processes ---
+
+XRESTART=""
+
+if [ -x "$mount_point/.$fs_module" ]; then
+	bash "$mount_point/.$fs_module"
+else
+	#- update ld.conf.so (libraries)
+	if [ ! -z "`which ldconfig`" ]; then
+	 	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
+	 		echo "Обновление library cache /etc/ld.so.cache..."
+	 		ldconfig
+	 	fi
+	fi	
+#- update/refesh menus 	
+	if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ];then
+		fixmenus
+		icewm --restart
+	fi
+	if [ -f "$mount_point"/start.sh ];then 
+		"$mount_point"/start.sh 
+	fi	 	
+	#- make new kernel modules available, must still be loaded when needed
+	kernel_version="`uname -r`"
+	if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+		echo "Запуск depmod...."
+		depmod
+	fi
+#make new fonts available
+	for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+	do
+		if [ -d "$mount_point/$font_dir" ]; then
+			cd "$font_dir"
+			`which mkfontscale` .
+			`which mkfontdir` .
+		fi		
+	done
+fi
+
+[ -x /usr/local/bin/refreshDesktopIcons ] && /usr/local/bin/refreshDesktopIcons
+# dim-kut ---+DdShurick add--
+if [ -d /usr/local/sfs_event ];then
+ if [ "$(ls /usr/local/sfs_event/sfs_scripts | grep $fs_name)" = "" ]; then 
+/usr/local/sfs_event/sfs_add "$SQMOD"
+ else
+mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
+sed "s/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-${fs_name}/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-${fs_name}/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
+ fi
+fi
+ntf -i "Успешно! Модуль $fs_module подключен." &

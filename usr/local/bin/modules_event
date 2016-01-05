@@ -1,20 +1,17 @@
 #!/bin/sh
-#DdShurick 25.01.15 GPL v2 modifited for Richy and PRA
+#DdShurick 25.01.15 GPL v2 modifited for Richy
 [ "$(whoami)" = root ] || sudo=sudo
-if [ -f /var/log/*-livedbg ]; then
- eval $(grep -m 2 mnt /var/log/*-livedbg | grep -n mnt | sed 's/1:/IFDEV=/;s/2:/IFDIR=/')
- DISTRO_REPO="`awk -F"/iso/" '{print $1}' /etc/pra`/pfs/" ###sfs
- PDEV1=$(basename $IFDEV)
-elif [ -f /etc/rc.d/PUPSTATE ]; then
+
+if [ -f /etc/rc.d/PUPSTATE ]; then
  eval $(egrep 'PSUBDIR|PDEV1' /etc/rc.d/PUPSTATE)
  IFDIR=$(grep $PDEV1 /proc/mounts | awk '{print $2}')${PSUBDIR}
  eval $(grep DISTRO_REPO /etc/DISTRO_SPECS) #repository in DISTRO_SPECS
 else
  exit 1
 fi
-
+#IFDIR=$($sudo busybox losetup | awk -F\/ '/loop0:/ {print "/initrd/"$4"/"$5"/"$6}')
 if [ "$IFDIR" = "$PSUBDIR" ]; then 
- mkdir -p /mnt/$PDEV1
+ $sudo mkdir -p /mnt/$PDEV1
  $sudo mount /dev/$PDEV1 /mnt/$PDEV1
  IFDIR=/mnt/${PDEV1}${PSUBDIR}
  UMNT=1
@@ -46,7 +43,7 @@ export Repo="<vbox>
 		</button>
 	</hbox>
 </vbox>"
-eval $(gtkdialog3 -c --program "Repo" --geometry 640x480)
+eval $(gtkdialog -c --program "Repo" --geometry 640x480)
 
 [ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
 
@@ -73,17 +70,19 @@ BUTTON_C="<button>
 			<label>Отключить</label>
 		</button>"
 menu () {
-LIST=$($sudo busybox losetup | awk '!/\/0[0-9][0-9]|\-base|\-save|kernel/ {print $3}')
+LIST=$($sudo losetup -a | awk '!/\-base|\-save|kernel/ {print $3}' | tr -d [\(\)])
 
 : > /tmp/onlist
 : > /tmp/allonlist
 : > /tmp/offlist
 
+GREP=$(cat /initrd/tmp/PFSMODULES | tr -d ' ' | tr '\n' '|')
  for M in $LIST
  do
   basename $M >> /tmp/allonlist
-  [ $(echo $M | egrep 'memory|initrd') ] && basename $M >> /tmp/onlist
+  [ $(echo $M | egrep -v "${GREP}^$") ] && basename $M >> /tmp/onlist
  done
+
 GREP=$(cat /tmp/allonlist | tr '\n' '|')
 [ "$1" = "--all" ] && pref=all || pref=''
 
@@ -95,7 +94,7 @@ find $IFDIR/modules $IFDIR/optional -maxdepth 1 ! -type d | egrep -v "${GREP}^$"
 
 export Menu="<window title=\"Modules_event\">
 <vbox>
-	<text><label>Подключениые, отключение, поиск модулей в сети.</label></text>
+	<text><label>Подключение, отключение, поиск модулей в сети.</label></text>
   <hbox>
 	<vbox scrollable=\"true\" height=\"440\">
 		<text><label>Подключенные модули</label></text>
@@ -128,7 +127,7 @@ export Menu="<window title=\"Modules_event\">
 	</vbox>
   </hbox>
 </vbox></window>"
-eval $(gtkdialog3 -c --program="Menu" --geometry="640x480")
+eval $(gtkdialog -c --program="Menu" --geometry="640x480")
 [ "$EXIT" = "Выйти" -o  "$EXIT" = "abort" ] && exit
 
 if [  "$EXIT" = "С автоподключенными" ]; then
@@ -145,7 +144,7 @@ if [  "$EXIT" = "Без автоподключенных" ]; then
  menu
 fi
 if [ "$EXIT" = "Скачать" ]; then
-	if [ "$(ping -c 1 ya.ru)" ]; then
+	if ping -c 1 ya.ru; then
 	 repo
 		if [ "$GET" = "" ]; then
 		 ntf -e "Ничего не выбрано"
