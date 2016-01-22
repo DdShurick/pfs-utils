@@ -13,7 +13,7 @@ if [ "$1" = "" ]; then echo "Не указан модуль."
  exit 1
 fi
 fs_module=$(basename "$1" | sed 's/\.[psx][fz][ms]//')
-mount_point="/mnt/live/memory/images/$fs_module"
+mount_point="$SYSMNT/memory/$fs_module"
 if [ "$($sudo losetup -a | grep "$fs_module")" = "" ]; then
  ntf -e "$fs_module не был подключен."
  exit 1

@@ -1,11 +1,14 @@
 #!/bin/sh
 #idea jcoder24 20080412
 #modified 20090222
-#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module
+#DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module, 22.01.2016 add SYSMNT
 # dim-kut add sfs_event
 
+[ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
+[ $SYSMNT ] || SYSMNT=/initrd
+
 ntf () {
-xmessage $2
+xpupsay $2
 }
 
 [ $(whoami) = root ] || sudo=sudo
@@ -86,14 +89,14 @@ fi
 ntf -i "Идет подключение модуля $fs_module..." &
 
 status=0
-mount_point="/mnt/live/memory/images/$fs_module"
+mount_point="$SYSMNT/memory/$fs_module"
 
 [ ! -d "$mount_point" ] && $sudo mkdir -p "$mount_point" 
 echo "Загрузка $fs_module..."
 
 if [ "$COPY" = "yes" ]; then
- cp "$SQMOD" /mnt/live/memory/copy2ram/
- SQMOD=/mnt/live/memory/copy2ram/$fs_name
+ cp "$SQMOD" /mnt$SYSMNT/tmpfs/
+ SQMOD=/mnt$SYSMNT/tmpfs/$fs_name
 fi
 
 $sudo mount -o loop "$SQMOD" "$mount_point"  
