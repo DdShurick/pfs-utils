@@ -1,20 +1,23 @@
 #!/bin/bash
 #idea jcoder24 20080412
 #modified 20090222
-#DdShurick modified 20100924 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module
+#DdShurick modified 20100924 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module, 22.01.2016 add SYSMNT
+
+[ "$(id -u)" -gt 1 ] && sudo=sudo
+[ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
+[ $SYSMNT ] || SYSMNT=/initrd
 
 ntf () {
-xmessage $2
+xpupsay $2
 }
 
-[ $(whoami) = root ] || sudo=sudo
 self="Отключить модуль"
 if [ "$1" = "" ]; then echo "Не указан модуль."
  exit 1
 fi
-fs_module=$(basename "$1" | sed 's/\.[psx][fz][ms]//')
+fs_module=$(basename "$1" | sed 's/\....$//')
 mount_point="$SYSMNT/memory/$fs_module"
-if [ "$($sudo losetup -a | grep "$fs_module")" = "" ]; then
+if [ "$(grep "$fs_module" /sys/fs/aufs/*/br[0-9]*)" = "" ]; then
  ntf -e "$fs_module не был подключен."
  exit 1
 fi
@@ -50,37 +53,32 @@ $sudo mount -o remount,del:"$mount_point"/ /
 
 XRESTART=""
 
-	#- update ld.conf.so (libraries)
-	if [ ! -z "`which ldconfig`" ]; then
-	 	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
-	 		echo "Updating library cache /etc/ld.so.cache..."
-	 		ldconfig
-	 	fi
+#- update ld.conf.so (libraries)
+if [ ! -z "`which ldconfig`" ]; then
+	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
+	 echo "Updating library cache /etc/ld.so.cache..."
+	 ldconfig
 	fi
-	
-	#- update/refesh menus 
-	if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ] 
-	then
-		fixmenus
-		icewm 
+fi
+#- update/refesh menus 
+if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ]; then
+ fixmenus
+fi
+#- make new kernel modules available, must still be loaded when needed
+kernel_version="`uname -r`"
+if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+ echo "Running depmod...."
+ depmod
+fi
+#make new fonts available
+for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+do
+	if [ -d "$mount_point/$font_dir" ]; then
+	 cd "$font_dir"
+	 `which mkfontscale` .
+	 `which mkfontdir` .
 	fi
-	
-	#- make new kernel modules available, must still be loaded when needed
-	kernel_version="`uname -r`"
-	if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
-		echo "Running depmod...."
-		depmod
-	fi
-
-	#make new fonts available
-	for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
-	do
-		if [ -d "$mount_point/$font_dir" ]; then
-			cd "$font_dir"
-			`which mkfontscale` .
-			`which mkfontdir` .
-		fi
-	done
+done
 
 $sudo umount -d "$mount_point" 
 $sudo rmdir "$mount_point"

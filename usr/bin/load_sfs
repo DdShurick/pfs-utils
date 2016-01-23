@@ -4,6 +4,7 @@
 #DdShurick modified 09.24.2010 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module, 22.01.2016 add SYSMNT
 # dim-kut add sfs_event
 
+[ "$(id -u)" -gt 1 ] && sudo=sudo
 [ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
 [ $SYSMNT ] || SYSMNT=/initrd
 
@@ -11,9 +12,8 @@ ntf () {
 xpupsay $2
 }
 
-[ $(whoami) = root ] || sudo=sudo
 UP="append"
-[ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
+#[ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
 
 case $1 in
 "") exit 1 ;;
@@ -34,7 +34,7 @@ case $1 in
 esac
 
 #--Check free loop ---
-if [ "$($sudo losetup -f)" = "" ]; then
+if [ "$($sudo busybox losetup -f)" = "" ]; then
 	ntf -e "Модуль не может быть подключен.
 	 Нет ни одного свободного устройства обратной связи"
 	exit 1
@@ -55,7 +55,7 @@ fs_path=$(dirname "$SQMOD") #may need to check
 fs_module=$(basename "$SQMOD" | sed 's/\....$//')
 fs_name=$(basename "$SQMOD")
 #--Check if module loaded or installed--- 
-if [ "$($sudo losetup -a | grep "$fs_module")" != "" ]; then
+if [ "$(grep "$fs_module" /sys/fs/aufs/*/br[0-9]*)" != "" ]; then
 	ntf -e " $fs_module уже подключен."
 	exit 1
 elif [ "$(ls -1 /etc/packages/mount/ | grep "$fs_module")" != "" ]; then
@@ -121,40 +121,35 @@ fi
 
 XRESTART=""
 
-if [ -x "$mount_point/.$fs_module" ]; then
-	bash "$mount_point/.$fs_module"
-else
-	#- update ld.conf.so (libraries)
-	if [ ! -z "`which ldconfig`" ]; then
-	 	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
-	 		echo "Обновление library cache /etc/ld.so.cache..."
-	 		ldconfig
-	 	fi
-	fi	
+#- update ld.conf.so (libraries)
+if [ ! -z "`which ldconfig`" ]; then
+	if [ -d  "$mount_point/usr/lib" -o -d "$mount_point/usr/local/lib" ]; then
+	 echo "Обновление library cache /etc/ld.so.cache..."
+	 ldconfig
+	fi
+fi	
 #- update/refesh menus 	
-	if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ];then
-		fixmenus
-		icewm --restart
-	fi
-	if [ -f "$mount_point"/start.sh ];then 
-		"$mount_point"/start.sh 
-	fi	 	
-	#- make new kernel modules available, must still be loaded when needed
-	kernel_version="`uname -r`"
-	if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
-		echo "Запуск depmod...."
-		depmod
-	fi
-#make new fonts available
-	for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
-	do
-		if [ -d "$mount_point/$font_dir" ]; then
-			cd "$font_dir"
-			`which mkfontscale` .
-			`which mkfontdir` .
-		fi		
-	done
+if [ `find "$mount_point" | grep -ic "desktop$"` -gt 0 ];then
+ fixmenus
 fi
+if [ -f "$mount_point"/start.sh ];then 
+ "$mount_point"/start.sh 
+fi	 	
+#- make new kernel modules available, must still be loaded when needed
+kernel_version="`uname -r`"
+if [  `find "$mount_point/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+ echo "Запуск depmod...."
+ depmod
+fi
+#make new fonts available
+for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+do
+	if [ -d "$mount_point/$font_dir" ]; then
+	 cd "$font_dir"
+	 `which mkfontscale` .
+	 `which mkfontdir` .
+	fi		
+done
 
 [ -x /usr/local/bin/refreshDesktopIcons ] && /usr/local/bin/refreshDesktopIcons
 # dim-kut ---+DdShurick add--
