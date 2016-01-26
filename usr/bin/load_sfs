@@ -56,10 +56,10 @@ fs_module=$(basename "$SQMOD" | sed 's/\....$//')
 fs_name=$(basename "$SQMOD")
 #--Check if module loaded or installed--- 
 if [ "$(grep "$fs_module" /sys/fs/aufs/*/br[0-9]*)" != "" ]; then
-	ntf -e " $fs_module уже подключен."
+	ntf -e " $fs_name уже подключен."
 	exit 1
 elif [ "$(ls -1 /etc/packages/mount/ | grep "$fs_module")" != "" ]; then
-	ntf -e " $fs_module уже установленен в систему."
+	ntf -e " $fs_name уже установленен в систему."
 	exit 1
 fi 
 
@@ -68,7 +68,7 @@ if [ ! -f "$SQMOD" ]; then
 	if [ -L "$SQMOD" ]; then
       	ntf -e "Неправильная символическая ссылка!"
 	else
-		ntf -e " $fs_module не существует"
+		ntf -e " $fs_name не существует"
 	fi
 	exit 1
 fi
@@ -86,13 +86,13 @@ if [ "$COPY" != "yes" ]; then
 	   fi
 	done
 fi
-ntf -i "Идет подключение модуля $fs_module..." &
+ntf -i "Идет подключение модуля $fs_name..." &
 
 status=0
-mount_point="$SYSMNT/memory/$fs_module"
+mount_point="$SYSMNT/bundles/$fs_name"
 
 [ ! -d "$mount_point" ] && $sudo mkdir -p "$mount_point" 
-echo "Загрузка $fs_module..."
+echo "Загрузка $fs_name..."
 
 if [ "$COPY" = "yes" ]; then
  cp "$SQMOD" /mnt$SYSMNT/tmpfs/
@@ -112,7 +112,7 @@ ntf -e "Ошибка! Не union формат файла $1."
 	exit 1
    fi
 else
-	ntf -e "Ошибка! Невозможно подключить ${fs_module}${FS}."
+	ntf -e "Ошибка! Невозможно подключить $fs_name."
 	$sudo rmdir "$mount_point"
 	exit 1
 fi
@@ -161,4 +161,4 @@ mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
 sed "s/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-${fs_name}/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-${fs_name}/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-ntf -i "Успешно! Модуль $fs_module подключен." &
+ntf -i "Успешно! Модуль $fs_name подключен." &

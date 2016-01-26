@@ -6,6 +6,7 @@
 [ "$(id -u)" -gt 1 ] && sudo=sudo
 [ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
 [ $SYSMNT ] || SYSMNT=/initrd
+SQMOD=$(realpath $1)
 
 ntf () {
 xpupsay $2
@@ -15,15 +16,15 @@ self="Отключить модуль"
 if [ "$1" = "" ]; then echo "Не указан модуль."
  exit 1
 fi
-fs_module=$(basename "$1" | sed 's/\....$//')
-mount_point="$SYSMNT/memory/$fs_module"
+fs_name=$(basename "$SQMOD")
+mount_point="$SYSMNT/bundles/$fs_name"
 if [ "$(grep "$fs_module" /sys/fs/aufs/*/br[0-9]*)" = "" ]; then
- ntf -e "$fs_module не был подключен."
+ ntf -e "$fs_name не был подключен."
  exit 1
 fi
 
 #--- Check args and requirements ---
-if [ "$(file "$1" | grep 'Squashfs filesystem')" = "" ] ; then
+if [ "$(file "$SQMOD" | grep 'Squashfs filesystem')" = "" ] ; then
    echo "$1 не squashfs."
    exit 1
 else
@@ -31,7 +32,7 @@ else
       if [ -L "$1" ]; then
       	echo "Неправильная символическая ссылка!"
       else
-      	echo "$fs_module не существует!"
+      	echo "$fs_name не существует!"
       fi
       exit 1
    fi
@@ -47,7 +48,7 @@ do
  $sudo kill $Ppid
 done
 
-ntf -i "Идет отключение модуля $fs_module" &
+ntf -i "Идет отключение модуля $fs_name" &
 
 $sudo mount -o remount,del:"$mount_point"/ /
 
@@ -98,11 +99,11 @@ FULL_PATH="${pwd_path}/${fs_name}"
 fi
 # dim-kut ---+DdShurick add--
 if [ -d /usr/local/sfs_event ];then
- if [ "$(ls /usr/local/sfs_event/sfs_scripts | grep $fs_module)" = "" ]; then 
+ if [ "$(ls /usr/local/sfs_event/sfs_scripts | grep $fs_name)" = "" ]; then 
 /usr/local/sfs_event/sfs_remove "$FULL_PATH"
  else
 mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
-sed "s/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-$fs_module/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-$fs_module/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
+sed "s/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-$fs_name/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-$fs_name/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-ntf -i "Успешно! Модуль $fs_module отключен." &
+ntf -i "Успешно! Модуль $fs_name отключен." &
