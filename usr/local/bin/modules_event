@@ -65,14 +65,14 @@ IFDIR=$(echo "$LIST"|cut -f-4 -d'/'|sort -u)
 : > /tmp/allonlist
 : > /tmp/offlist
 
-GREP=$(cat /tmp/PFSMODULES | tr -d ' ' | tr '\n' '|')
+GREP=$(cat /tmp/PFSMODULES | sed 's/\....$//' | tr '\n' '|')
  for M in $LIST
  do
   basename $M >> /tmp/allonlist
   [ $(echo $M | egrep -v "${GREP}^$") ] && basename $M >> /tmp/onlist
  done
 
-GREP=$(cat /tmp/allonlist | tr '\n' '|')
+GREP=$(cat /tmp/allonlist | sed 's/\....$//' | tr '\n' '|')
 [ "$1" = "--all" ] && pref=all || pref=''
 
 find $IFDIR/modules $IFDIR/optional -maxdepth 1 ! -type d | egrep -v "${GREP}^$" | while read M
