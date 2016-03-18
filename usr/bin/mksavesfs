@@ -1,0 +1,30 @@
+#!/bin/sh
+# DdShurick GPL-v2 18.03.16 for Richy initrd_mnt
+if [ "$(id -u)" != 0 ]; then
+loginroot $0
+exit
+fi
+#Задаём переменные
+. /etc/initvars
+SAVEPATH=/mnt/${PDEV}${PDIR}/base
+
+[ "$(grep $PDEV /proc/mounts)" ] || mount /dev/$PDEV /mnt/$PDEV
+#Последовательно копируем 2 1 0 слои
+mkdir -p /tmp/savesfs-root
+[ "$(grep "save_sq " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_sq/* /tmp/savesfs-root/
+[ "$(grep "save_ext " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_ext/* /tmp/savesfs-root/
+cp -a $(ls -d /$SYSMNT/changes/[!dimstv]*) /tmp/savesfs-root/
+#echo false > /tmp/savesfs-root/etc/.XLOADED
+#Удаляем "затенённые" (отмеченные как удалённые) файлы и каталоги.
+find /tmp/savesfs-root -mindepth 2 -name .wh.* | while read WH
+do
+F=$(echo $WH | sed 's/\/tmp\/savesfs-root//;s/.wh.//g')
+	if [ -e "/initrd/pup_rw$F" ]; then
+	 rm $WH #если удалённый файл заново создан, удаляем .wh.*
+	else
+	 [ -e "/tmp/savesfs-root$F" ] && rm -r /tmp/savesfs-root$F #если ранее сохранённый файл удалён, удаляем его.
+	fi # если .wh.* относится к нижним слоям - ничего не делаем
+done
+#Создаём новый файл сохранения
+mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs.old
+mksquashfs /tmp/savesfs-root/ $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs -comp xz && rm -r /tmp/savesfs-root
