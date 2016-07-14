@@ -65,7 +65,7 @@ IFDIR=$(echo "$LIST"|cut -f-4 -d'/'|sort -u)
 : > /tmp/allonlist
 : > /tmp/offlist
 
-GREP=$(cat /tmp/PFSMODULES | sed 's/\....$//' | tr '\n' '|')
+GREP=$(cat /tmp/XZMMODULES | sed 's/\....$//' | tr '\n' '|')
  for M in $LIST
  do
   basename $M >> /tmp/allonlist
