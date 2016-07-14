@@ -9,12 +9,14 @@ fi
 SAVEPATH=/mnt/${PDEV}${PDIR}/base
 
 [ "$(grep $PDEV /proc/mounts)" ] || mount /dev/$PDEV /mnt/$PDEV
+[ -d /mnt/${PDEV}${PDIR}/changes ] && SYSMNT=mnt/${PDEV}${PDIR}
 #Последовательно копируем 2 1 0 слои
 mkdir -p /tmp/savesfs-root
 [ "$(grep "save_sq " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_sq/* /tmp/savesfs-root/
 [ "$(grep "save_ext " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_ext/* /tmp/savesfs-root/
 cp -a $(ls -d /$SYSMNT/changes/[!dimstv]*) /tmp/savesfs-root/
-#echo false > /tmp/savesfs-root/etc/.XLOADED
+#[ "$SYSMNT" = "mnt/${PDEV}${PDIR}" ] && rm -r /$SYSMNT/changes
+echo false > /tmp/savesfs-root/etc/.XLOADED
 #Удаляем "затенённые" (отмеченные как удалённые) файлы и каталоги.
 find /tmp/savesfs-root -mindepth 2 -name .wh.* | while read WH
 do
@@ -26,5 +28,5 @@ F=$(echo $WH | sed 's/\/tmp\/savesfs-root//;s/.wh.//g')
 	fi # если .wh.* относится к нижним слоям - ничего не делаем
 done
 #Создаём новый файл сохранения
-mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs.old
-mksquashfs /tmp/savesfs-root/ $SAVEPATH/${DISTRO_FILE_PREFIX}-save.sfs -comp xz && rm -r /tmp/savesfs-root
+mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm.old
+mksquashfs /tmp/savesfs-root/ $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm -comp xz && rm -r /tmp/savesfs-root

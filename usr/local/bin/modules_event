@@ -148,10 +148,10 @@ fi
 }
 menu
 if [  "$EXIT" = "Подключить" ]; then
- [ "$ON_MODULE" ] && load_sfs $(find $IFDIR/ -name $ON_MODULE) || ntf -e "Ничего не выбрано"
+ [ "$ON_MODULE" ] && load_xzm $(find $IFDIR/ -name $ON_MODULE) || ntf -e "Ничего не выбрано"
 fi
 if [  "$EXIT" = "Отключить" ]; then
- [ "$OFF_MODULE" ] && unload_sfs $(echo "$LIST" | grep $OFF_MODULE) || ntf -e "Ничего не выбрано"
+ [ "$OFF_MODULE" ] && unload_xzm $(echo "$LIST" | grep $OFF_MODULE) || ntf -e "Ничего не выбрано"
 fi
 
 [ "$UMNT" = 1 ] && $sudo umount /mnt/$PDEV1 && $sudo rmdir /mnt/$PDEV1

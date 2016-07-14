@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Сохранить настройки в xzm
+Icon=mini-ray.xpm
+Comment=Сохранить настройки в xzm
+Exec=loginroot mksavexzm
+Terminal=false
+Type=Application
+Categories=X-SetupUtility
+GenericName=Сохранить настройки в xzm
