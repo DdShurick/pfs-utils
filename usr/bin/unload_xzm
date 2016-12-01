@@ -9,7 +9,7 @@
 SQMOD=$(realpath $1)
 
 ntf () {
-xpupsay $2
+[ "$(which xpupsay)" ] && xpupsay $2 || echo $2
 }
 
 self="Отключить модуль"
