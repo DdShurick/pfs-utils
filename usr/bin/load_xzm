@@ -5,7 +5,7 @@
 # dim-kut add sfs_event
 
 [ "$(id -u)" -gt 1 ] && sudo=sudo
-[ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
+[ -f /etc/initvars ] && . /etc/initvars
 [ $SYSMNT ] || SYSMNT=/initrd
 
 ntf () {

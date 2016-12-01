@@ -27,6 +27,11 @@ F=$(echo $WH | sed 's/\/tmp\/savesfs-root//;s/.wh.//g')
 	 [ -e "/tmp/savesfs-root$F" ] && rm -r /tmp/savesfs-root$F #если ранее сохранённый файл удалён, удаляем его.
 	fi # если .wh.* относится к нижним слоям - ничего не делаем
 done
+#sfs_code
+#for i in `find /tmp/makesfs -name ".wh.*"` ;do
+#    i2="`dirname "$i"`/`basename "$i" |sed 's/.wh.//`"
+#    [ `stat -c %Y "$i2"` -gt `stat -c %Y "$i"` ] || rm "$i"
+#done
 #Создаём новый файл сохранения
 mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm.old
 mksquashfs /tmp/savesfs-root/ $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm -comp xz && rm -r /tmp/savesfs-root
