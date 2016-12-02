@@ -9,7 +9,7 @@
 [ $SYSMNT ] || SYSMNT=/initrd
 
 ntf () {
-[ "$(which xpupsay)" ] && xpupsay $2 || echo $2
+[ "$(which xpupsay 2>/dev/nul)" ] && xpupsay $2 || echo $2
 }
 
 UP="append"
@@ -161,4 +161,4 @@ mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
 sed "s/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-${fs_name}/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-${fs_name}/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-ntf -i "Успешно! Модуль $fs_name подключен." &
+ntf -i "Успешно! Модуль $fs_name подключен."

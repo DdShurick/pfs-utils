@@ -4,15 +4,14 @@
 #DdShurick modified 20100924 for PuppyRus-2, 08.26.2012 for Richy-217, 11.05.2012 for .pfs, 17.01.2015 for all squasfs module, 22.01.2016 add SYSMNT
 
 [ "$(id -u)" -gt 1 ] && sudo=sudo
-[ -f /tmp/PUPSTATE ] && . /tmp/PUPSTATE
+[ -f /etc/initvars ] && . /etc/initvars
 [ $SYSMNT ] || SYSMNT=/initrd
 SQMOD=$(realpath $1)
 
 ntf () {
-[ "$(which xpupsay)" ] && xpupsay $2 || echo $2
+[ "$(which xpupsay 2>/dev/nul)" ] && xpupsay $2 || echo $2
 }
 
-self="Отключить модуль"
 if [ "$1" = "" ]; then echo "Не указан модуль."
  exit 1
 fi
@@ -106,4 +105,4 @@ mv -f $HOME/.icewm/menu $HOME/.icewm/menu-previous
 sed "s/ok.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/dlg-$fs_name/error.xpm\" \/usr\/local\/sfs_event\/sfs_scripts\/reload-$fs_name/" $HOME/.icewm/menu-previous > $HOME/.icewm/menu
  fi
 fi
-ntf -i "Успешно! Модуль $fs_name отключен." &
+ntf -i "Успешно! Модуль $fs_name отключен."
