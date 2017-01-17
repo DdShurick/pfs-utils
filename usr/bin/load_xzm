@@ -13,7 +13,7 @@ ntf () {
 }
 
 UP="append"
-#[ "$(egrep 'pfix=copy|copy2ram' /proc/cmdline)" ] && COPY=yes
+
 
 case $1 in
 "") exit 1 ;;
