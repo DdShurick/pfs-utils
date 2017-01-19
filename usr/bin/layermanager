@@ -1,19 +1,21 @@
 #!/bin/sh
-#layeradd: to connect the module to the layer aufs. GPL v2, DdShurick, 17.01.2017.
-FREELOOP=$(losetup -f | tr -d [a-z/])
-#FREELOOP=$(losetup -f | cut -b10-)
+#layermanager: to connect the module to the layer aufs. GPL v2, DdShurick, 17.01.2017.
+
+PROGNAME=`basename $0`
+
 usage () {
 	echo "Usage:"
-	echo "	 `basename $0` [key] modulename"
+	echo "	 PROGNAME [key] modulename"
 	echo "keys:"
+	echo "	 -d|--delete|--del - to delete the module from the layer"
 	echo "	 -h|--help - this usage"
 	echo "	 -i|--install - to install the module in / as the package"
 	echo "	 -n - not to execute the commands depmod and ldconfig after connecting"
+	echo "	 -s|--show - show all layers == showlayers"
 	echo "	 -u N|--uplevel N - to connect the module to the layer N"
+	echo "	 -v|--verbose"
 	exit 0
 }
-
-[ $1 ] || usage
 
 check_status() {
 	echo -en "\\033[72G"
@@ -28,22 +30,50 @@ check_status() {
 	fi
 }
 
+err() {
+	if [ "$1" != 0 ]; then
+		echo $2 
+		exit $1
+	fi
+}
+
+showlayers() {
+	##developer sfs
+	echo "Слои AUFS (the top layer covers anything below)" #верхний слой перекрывает все что ниже
+	printf %3s "N "; printf %-51s Модуль; printf "Путь\n\n"
+	n=0
+	while true; do 
+    	BR="`cat /sys/fs/aufs/si_*/br$n 2>/dev/null`" && printf %3s "$n " && printf %-45s `basename $BR` && echo `dirname $BR` || break
+    	n=$(expr $n + 1)
+	done
+	exit 0
+}
+
+[ "$PROGNAME" = "layermanager" ] || $PROGNAME #
+[ $1 ] || usage
+CS="err"
 MNTCMD=append
-O=$(getopt -l help,install,uplevel: hinu: $@) || usage
+FREELOOP=$(losetup -f | tr -d [a-z/])
+#FREELOOP=$(losetup -f | cut -b10-)
+
+O=$(getopt -l delete,del,debug,help,install,show,uplevel: -- Ddhinsu: $@) || usage
 eval set -- "$O"
 for OPT in $O
 do
 	case "$OPT" in
-	-h|--help) usage;;
+	-d|--delete|--del) DELCMD=del; shift;;
+	-h|--help) usage; break;;
 	-i|--install) CMD="unsquashfs -f -d /"; shift;;
 	-n) LD=no; shift;;
-	-u|--uplevel) 
-		if [ $LOOP -gt $2 ]; then
-	 	MNTCMD=up:$2; shift 2
+	-s|--show) showlayers; break;;
+	-u|--uplevel)
+		if [ "$LOOP" -gt "$2" ]; then
+	 		MNTCMD=up:$2; shift 2
 	 	else
-	 	check_status 1 "Invalid -u key" 
-	 	shift; fi 
+	 		$CS 1 "Invalid -u key" 
+	 	shift; fi
 	 ;;
+	 -v|--verbose) CS="check_status"; shift;;
 	--)	shift; break;;
 	esac
 done
@@ -51,11 +81,11 @@ done
 [ "$CMD" ] && MNTCMD=""
 [ "$SYSMNT" ] || SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0)
 
-echo -n "Find module"
-MOD=$(realpath $1) && check_status 0 || check_status 1 "No file $1"
+echo -n "Find module "
+MOD=$(realpath $1) && $CS 0 || $CS 1 "No file $1"
 MODNAME=$(basename $MOD)
-echo -n "Check free loop "
-[ "$(losetup -f)" ]; check_status $?
+echo -n "Check free loop: "
+[ "$(losetup -f)" ]; $CS $?
 
 echo -n "Check module: "
 if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
@@ -75,13 +105,13 @@ elif [ "$(file -b $MOD | grep 'directory')" ]; then
 	echo -n "$MOD is directory"
 	[ "$CMD" ] && CMD="cp -a $MOD/* /"
 else
-	check_status 1 "invalid $MOD"
+	$CS 1 "invalid $(basename $MOD)"
 fi
-check_status 0
+$CS 0
 
 echo ""
 echo "Отчёт:"
 [ "$MNTCMD" ] && echo "Подключить $MNTCMD"
 [ "$CMD" ] && echo "Установить $CMD"
 [ "$LD" ] && echo "depmod and ldconfig $LD"
-check_status 0
+$CS 0
