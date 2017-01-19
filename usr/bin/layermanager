@@ -1,0 +1,87 @@
+#!/bin/sh
+#layeradd: to connect the module to the layer aufs. GPL v2, DdShurick, 17.01.2017.
+FREELOOP=$(losetup -f | tr -d [a-z/])
+#FREELOOP=$(losetup -f | cut -b10-)
+usage () {
+	echo "Usage:"
+	echo "	 `basename $0` [key] modulename"
+	echo "keys:"
+	echo "	 -h|--help - this usage"
+	echo "	 -i|--install - to install the module in / as the package"
+	echo "	 -n - not to execute the commands depmod and ldconfig after connecting"
+	echo "	 -u N|--uplevel N - to connect the module to the layer N"
+	exit 0
+}
+
+[ $1 ] || usage
+
+check_status() {
+	echo -en "\\033[72G"
+	if [ $1 -eq 0 ]; then
+		echo -en "\\033[1;32mOK"
+		echo -e "\\033[0;39m"
+	else
+		echo -en "\\033[1;31mError"
+		echo -e "\\033[0;39m"
+		echo $2
+		exit 1
+	fi
+}
+
+MNTCMD=append
+O=$(getopt -l help,install,uplevel: hinu: $@) || usage
+eval set -- "$O"
+for OPT in $O
+do
+	case "$OPT" in
+	-h|--help) usage;;
+	-i|--install) CMD="unsquashfs -f -d /"; shift;;
+	-n) LD=no; shift;;
+	-u|--uplevel) 
+		if [ $LOOP -gt $2 ]; then
+	 	MNTCMD=up:$2; shift 2
+	 	else
+	 	check_status 1 "Invalid -u key" 
+	 	shift; fi 
+	 ;;
+	--)	shift; break;;
+	esac
+done
+
+[ "$CMD" ] && MNTCMD=""
+[ "$SYSMNT" ] || SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0)
+
+echo -n "Find module"
+MOD=$(realpath $1) && check_status 0 || check_status 1 "No file $1"
+MODNAME=$(basename $MOD)
+echo -n "Check free loop "
+[ "$(losetup -f)" ]; check_status $?
+
+echo -n "Check module: "
+if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
+	echo -n "Squashfs "
+	if [ "$(file -b $MOD | grep 'version 4.0')" = "" ]; then
+		MSGERR="$MOD старая версия squashfs. Перепакуйте."
+	else
+		echo -n "version 4.0"
+		[ "$CMD" ] && CMD="$CMD $MOD"
+		[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MOD && mount -o loop $MOD /$SYSMNT/bundles/$MOD && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MOD/ /"
+	fi
+elif [ "$(file -b $MOD | grep 'Linux rev 1.0 ext')" ]; then
+	echo -n "$MODNAME is file ext filesystem"
+	[ "$CMD" ] && CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
+	[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
+elif [ "$(file -b $MOD | grep 'directory')" ]; then
+	echo -n "$MOD is directory"
+	[ "$CMD" ] && CMD="cp -a $MOD/* /"
+else
+	check_status 1 "invalid $MOD"
+fi
+check_status 0
+
+echo ""
+echo "Отчёт:"
+[ "$MNTCMD" ] && echo "Подключить $MNTCMD"
+[ "$CMD" ] && echo "Установить $CMD"
+[ "$LD" ] && echo "depmod and ldconfig $LD"
+check_status 0
