@@ -53,10 +53,10 @@ showlayers() {
 [ $1 ] || usage
 CS="err"
 MNTCMD=append
-FREELOOP=$(losetup -f | tr -d [a-z/])
-#FREELOOP=$(losetup -f | cut -b10-)
+FREELOOP=$(/sbin/losetup -f | tr -d [a-z/])
+#FREELOOP=$(/sbin/losetup -f | cut -b10-)
 
-O=$(getopt -l delete,del,debug,help,install,show,uplevel: -- Ddhinsu: $@) || usage
+O=$(getopt -l delete,del,debug,help,install,show,verbose,uplevel: -- Ddhinsvu: $@) || usage
 eval set -- "$O"
 for OPT in $O
 do
@@ -85,7 +85,7 @@ echo -n "Find module "
 MOD=$(realpath $1) && $CS 0 || $CS 1 "No file $1"
 MODNAME=$(basename $MOD)
 echo -n "Check free loop: "
-[ "$(losetup -f)" ]; $CS $?
+[ "$(/sbin/losetup -f)" ]; $CS $?
 
 echo -n "Check module: "
 if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
@@ -95,17 +95,17 @@ if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
 	else
 		echo -n "version 4.0"
 		[ "$CMD" ] && CMD="$CMD $MOD"
-		[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MOD && mount -o loop $MOD /$SYSMNT/bundles/$MOD && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MOD/ /"
+		[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
 	fi
 elif [ "$(file -b $MOD | grep 'Linux rev 1.0 ext')" ]; then
 	echo -n "$MODNAME is file ext filesystem"
 	[ "$CMD" ] && CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
 	[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
 elif [ "$(file -b $MOD | grep 'directory')" ]; then
-	echo -n "$MOD is directory"
+	echo -n "$MODNAME is directory"
 	[ "$CMD" ] && CMD="cp -a $MOD/* /"
 else
-	$CS 1 "invalid $(basename $MOD)"
+	$CS 1 "invalid $MODNAME"
 fi
 $CS 0
 
