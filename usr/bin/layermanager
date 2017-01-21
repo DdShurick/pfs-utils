@@ -1,8 +1,6 @@
 #!/bin/sh
 #layermanager: to connect the module to the layer aufs. GPL v2, DdShurick, 17.01.2017.
 
-PROGNAME=`basename $0`
-
 usage () {
 	echo "Usage:"
 	echo "	 PROGNAME [key] modulename"
@@ -49,6 +47,25 @@ showlayers() {
 	exit 0
 }
 
+modulemount() {
+	[ $CMT ] && echo -n "mount $MODNAME"
+	$SUDO mkdir -p /$SYSMNT/bundles/$MODNAME
+	$SUDO mount -o loop $MOD /$SYSMNT/bundles/$MODNAME
+	$SUDO mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /
+	check_status $?
+}
+
+moduleinstall() {
+	[ $CMT ] && echo -n 
+	$SUDO mkdir -p /mnt/data
+	$SUDO mount -o loop $MOD /mnt/data
+	$SUDO cp -a /mnt/data/* /
+	$SUDO umount /mnt/data
+	check_status $?
+}
+
+[ "$(id -u)" = 0 ] || SUDO=sudo
+PROGNAME=`basename $0`
 [ "$PROGNAME" = "layermanager" ] || $PROGNAME #
 [ $1 ] || usage
 CS="err"
@@ -63,7 +80,7 @@ do
 	case "$OPT" in
 	-d|--delete|--del) DELCMD=del; shift;;
 	-h|--help) usage; break;;
-	-i|--install) CMD="unsquashfs -f -d /"; shift;;
+	-i|--install) CMD="$SUDO unsquashfs -f -d /"; shift;;
 	-n) LD=no; shift;;
 	-s|--show) showlayers; break;;
 	-u|--uplevel)
@@ -73,7 +90,7 @@ do
 	 		$CS 1 "Invalid -u key" 
 	 	shift; fi
 	 ;;
-	 -v|--verbose) CS="check_status"; shift;;
+	 -v|--verbose) CS="check_status"; CMT="ok"; shift;;
 	--)	shift; break;;
 	esac
 done
@@ -81,37 +98,38 @@ done
 [ "$CMD" ] && MNTCMD=""
 [ "$SYSMNT" ] || SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0)
 
-echo -n "Find module "
+[ $CMT ] && echo -n "Find module, "
 MOD=$(realpath $1) && $CS 0 || $CS 1 "No file $1"
 MODNAME=$(basename $MOD)
-echo -n "Check free loop: "
+[ $CMT ] && echo -n "Check free loop, "
 [ "$(/sbin/losetup -f)" ]; $CS $?
 
-echo -n "Check module: "
+[ $CMT ] && echo -n "Check module: "
 if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
-	echo -n "Squashfs "
+	[ $CMT ] && echo -n "Squashfs "
 	if [ "$(file -b $MOD | grep 'version 4.0')" = "" ]; then
 		MSGERR="$MOD старая версия squashfs. Перепакуйте."
 	else
-		echo -n "version 4.0"
-		[ "$CMD" ] && CMD="$CMD $MOD"
-		[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
+		[ $CMT ] && echo -n "version 4.0"
+		[ "$CMD" ] && $CMD $MOD #CMD="$CMD $MOD"
+		[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
 	fi
 elif [ "$(file -b $MOD | grep 'Linux rev 1.0 ext')" ]; then
-	echo -n "$MODNAME is file ext filesystem"
-	[ "$CMD" ] && CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
-	[ "$MNTCMD" ] && MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
+	[ $CMT ] && echo -n "$MODNAME is file ext filesystem"
+	[ "$CMD" ] && moduleinstall #CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
+	[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
 elif [ "$(file -b $MOD | grep 'directory')" ]; then
-	echo -n "$MODNAME is directory"
-	[ "$CMD" ] && CMD="cp -a $MOD/* /"
+	[ $CMT ] && echo -n "$MODNAME is directory"
+	[ "$CMD" ] && $SUDO cp -a $MOD/* / #CMD="cp -a $MOD/* /"
+	[ "$MNTCMD" ] && $SUDO mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /
 else
 	$CS 1 "invalid $MODNAME"
 fi
 $CS 0
-
+[ $CMT ] && exit 0
 echo ""
 echo "Отчёт:"
-[ "$MNTCMD" ] && echo "Подключить $MNTCMD"
-[ "$CMD" ] && echo "Установить $CMD"
+[ "$MNTCMD" ] && echo "Подключен $MODNAME точка монтирования /$SYSMNT/bundles/$MODNAME"
+[ "$CMD" ] && echo "Установлен $MODNAME"
 [ "$LD" ] && echo "depmod and ldconfig $LD"
 $CS 0
