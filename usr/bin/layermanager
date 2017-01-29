@@ -1,5 +1,9 @@
 #!/bin/sh
-#layermanager: to connect the module to the layer aufs. GPL v2, DdShurick, 17.01.2017.
+#layermanager: to connect the module to the layer aufs. GPL v2, DdShurick, 29.01.2017.
+
+checkroot() {
+	[ "$(id -u)" = 0 ] || msgerr "You must be root"
+}
 
 usage () {
 	echo "Usage:"
@@ -11,64 +15,83 @@ usage () {
 	echo "	 -n - not to execute the commands depmod and ldconfig after connecting"
 	echo "	 -s|--show - show all layers == showlayers"
 	echo "	 -u N|--uplevel N - to connect the module to the layer N"
-	echo "	 -v|--verbose"
 	exit 0
 }
 
-check_status() {
-	echo -en "\\033[72G"
-	if [ $1 -eq 0 ]; then
-		echo -en "\\033[1;32mOK"
-		echo -e "\\033[0;39m"
-	else
-		echo -en "\\033[1;31mError"
-		echo -e "\\033[0;39m"
-		echo $2
-		exit 1
-	fi
-}
-
-err() {
-	if [ "$1" != 0 ]; then
-		echo $2 
-		exit $1
-	fi
+msgerr() {
+	echo $1 
+	exit 1
 }
 
 showlayers() {
-	##developer sfs
-	echo "Слои AUFS (the top layer covers anything below)" #верхний слой перекрывает все что ниже
-	printf %3s "N "; printf %-51s Модуль; printf "Путь\n\n"
 	n=0
 	while true; do 
-    	BR="`cat /sys/fs/aufs/si_*/br$n 2>/dev/null`" && printf %3s "$n " && printf %-45s `basename $BR` && echo `dirname $BR` || break
+		echo -n "$n " 
+		cat /sys/fs/aufs/si_*/br$n 2>/dev/null || break
     	n=$(expr $n + 1)
 	done
 	exit 0
 }
 
 modulemount() {
-	[ $CMT ] && echo -n "mount $MODNAME"
-	$SUDO mkdir -p /$SYSMNT/bundles/$MODNAME
-	$SUDO mount -o loop $MOD /$SYSMNT/bundles/$MODNAME
-	$SUDO mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/=ro /
-	check_status $?
+	checkroot
+	if [ "$MODTYPE" = "dir" ]; then
+		mount -o remount,$MNTCMD:$MOD/=ro /
+	else
+		mkdir -p /$SYSMNT/bundles/$MODNAME
+		mount -o loop $MOD /$SYSMNT/bundles/$MODNAME
+		mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/=ro /
+	fi
+	exit $?
+}
+
+moduleumount() {
+	checkroot
+	if [ "$MODTYPE" = "dir" ]; then
+		mount -o remount,del:$MOD/ /
+	else
+		mount -o remount,del:/$SYSMNT/bundles/$MODNAME/ /
+		umount /$SYSMNT/bundles/$MODNAME
+		rmdir /$SYSMNT/bundles/$MODNAME
+	fi
+	exit $?
 }
 
 moduleinstall() {
-	[ $CMT ] && echo -n 
-	$SUDO mkdir -p /mnt/data
-	$SUDO mount -o loop $MOD /mnt/data
-	$SUDO cp -a /mnt/data/* /
-	$SUDO umount /mnt/data
-	check_status $?
+	checkroot
+	if [ "$MODTYPE" = "dir" ]; then
+		if [ ! -f $MOD/$SPECS/$MODNAME/pfs.files ]; then #if there is no list of files
+			find $MOD ! -type d | sed "s|$MOD||" > /$SPECS/$MODNAME/pfs.files
+		fi
+		cp -a "$MOD"/* /
+#	elif [ "$MODTYPE" = "sqfs" ]; then
+#		unsquashfs -f -d / "$MOD"
+#	elif [ "$MODTYPE" = "ext" ]; then
+	else
+		mkdir -p /mnt/$MODNAME
+		mount -o loop $MOD /mnt/$MODNAME
+		if [ ! -f /mnt/$MODNAME/$SPECS/$MODNAME/pfs.files ]; then #if there is no list of files
+			find /mnt/$MODNAME ! -type d | sed "s|/mnt/$MODNAME||" > /$SPECS/$MODNAME/pfs.files
+		fi
+		cp -a /mnt/$MODNAME/* /
+		umount /mnt/$MODNAME
+		rmdir /mnt/$MODNAME
+	fi
+	exit $?
+}
+#if the module was installed
+moduledelete() {
+	checkroot
+	cp /$SPECS/$MODNAME/pfs.files /tmp/remove.lst 2>/dev/null || msgerr "There is no list of files to delete"
+	cat /tmp/remove.lst | while read F; do rm $F; done
+	exit $?
 }
 
-[ "$(id -u)" = 0 ] || SUDO=sudo
 PROGNAME=`basename $0`
 [ "$PROGNAME" = "layermanager" ] || $PROGNAME #
 [ $1 ] || usage
-CS="err"
+#CS="msgerr"
+SPECS="etc/packages/mount"
 MNTCMD=append 
 [ "$(readlink /sbin/losetup)" = '../bin/busybox' ] && FREELOOP=$(/sbin/losetup -f | tr -d [a-z/]) || FREELOOP=$(/sbin/losetup -a | tail -n1 | cut -b 10-11)
 #FREELOOP=$(/sbin/losetup -f | cut -b10-)
@@ -78,9 +101,9 @@ eval set -- "$O"
 for OPT in $O
 do
 	case "$OPT" in
-	-d|--delete|--del) DELCMD=del; shift;;
+	-d|--delete|--del) ACT=del; shift;;
 	-h|--help) usage; break;;
-	-i|--install) CMD="$SUDO unsquashfs -f -d /"; shift;;
+	-i|--install) ACT=ins; CMD="unsquashfs -f -d /"; shift;;
 	-n) LD=no; shift;;
 	-s|--show) showlayers; break;;
 	-u|--uplevel)
@@ -90,7 +113,7 @@ do
 	 		$CS 1 "Invalid -u key" 
 	 	shift; fi
 	 ;;
-	 -v|--verbose) CS="check_status"; CMT="ok"; shift;;
+#	 -v|--verbose) CS="check_status"; CMT="ok"; shift;;
 	--)	shift; break;;
 	esac
 done
@@ -98,35 +121,44 @@ done
 [ "$CMD" ] && MNTCMD=""
 [ "$SYSMNT" ] || SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0)
 
-[ $CMT ] && echo -n "Find module, "
-MOD=$(realpath $1) && $CS 0 || $CS 1 "No file $1"
+#"Find module, "
+MOD=$(realpath $1) || msgerr "No file $1"
 MODNAME=$(basename $MOD)
-[ $CMT ] && echo -n "Check free loop, "
-[ "$(/sbin/losetup -f)" ]; $CS $?
 
-[ $CMT ] && echo -n "Check module: "
-if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
-	[ $CMT ] && echo -n "Squashfs "
-	if [ "$(file -b $MOD | grep 'version 4.0')" = "" ]; then
-		MSGERR="$MOD старая версия squashfs. Перепакуйте."
-	else
-		[ $CMT ] && echo -n "version 4.0"
-		[ "$CMD" ] && $CMD $MOD #CMD="$CMD $MOD"
-		[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
-	fi
-elif [ "$(file -b $MOD | grep 'Linux rev 1.0 ext')" ]; then
-	[ $CMT ] && echo -n "$MODNAME is file ext filesystem"
-	[ "$CMD" ] && moduleinstall #CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
-	[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
-elif [ "$(file -b $MOD | grep 'directory')" ]; then
-	[ $CMT ] && echo -n "$MODNAME is directory"
-	[ "$CMD" ] && $SUDO cp -a $MOD/* / #CMD="cp -a $MOD/* /"
-	[ "$MNTCMD" ] && $SUDO mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /
-else
-	$CS 1 "invalid $MODNAME"
-fi
-$CS 0
-[ $CMT ] && exit 0
+#"Check free loop, "
+[ "$ACT" = "mnt" ] && [ "$(/sbin/losetup -f)" = "" ] && msgerr "No free loops"
+
+#"Check moduletype: "
+case $(file -b $MOD) in
+directory) MODTYPE="dir" ;;
+Squashfs*4.0*) MODTYPE="sqfs" ;;
+Linux*ext*) MODTYPE="ext" ;;
+*) msgerr "Invalid format $MODNAME"
+;;
+esac
+
+#if [ "$(file -b $MOD | grep 'Squashfs filesystem')" ]; then
+#	[ $CMT ] && echo -n "Squashfs "
+#	if [ "$(file -b $MOD | grep 'version 4.0')" = "" ]; then
+#		MSGERR="$MOD старая версия squashfs. Перепакуйте."
+#	else
+#		[ $CMT ] && echo -n "version 4.0"
+#		[ "$CMD" ] && $CMD $MOD #CMD="$CMD $MOD"
+#		[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
+#	fi
+#elif [ "$(file -b $MOD | grep 'Linux rev 1.0 ext')" ]; then
+#	[ $CMT ] && echo -n "$MODNAME is file ext filesystem"
+#	[ "$CMD" ] && moduleinstall #CMD="mount -o loop $MOD /mnt/data && cp -a /mnt/data/* / && umount /mnt/data"
+#	[ "$MNTCMD" ] && modulemount #MNTCMD="mkdir -p /$SYSMNT/bundles/$MODNAME && mount -o loop $MOD /$SYSMNT/bundles/$MODNAME && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /"
+#elif [ "$(file -b $MOD | grep 'directory')" ]; then
+#	[ $CMT ] && echo -n "$MODNAME is directory"f
+#	[ "$CMD" ] && cp -a $MOD/* /
+#	[ "$MNTCMD" ] && mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/ /
+#else
+#	$CS 1 "invalid $MODNAME"
+#fi
+#$CS 0
+#[ $CMT ] && exit 0
 echo ""
 echo "Отчёт:"
 [ "$MNTCMD" ] && echo "Подключен $MODNAME точка монтирования /$SYSMNT/bundles/$MODNAME"
