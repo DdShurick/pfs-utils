@@ -53,6 +53,7 @@ modulemount() {
 	checkroot
 	moduletype "$1"
 	if [ "$MODTYPE" = "dir" ]; then
+		[ "$(df /initrd/changes | egrep '/dev/|tmpfs')" ] || msgerr "Directory in aufs, mount impossible"
 		mount -o remount,$MNTCMD:$MOD/=ro /
 	else
 		[ "$(/sbin/losetup -f)" = "" ] && msgerr "No free loops"
