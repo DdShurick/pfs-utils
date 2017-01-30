@@ -108,7 +108,8 @@ moduledelete() {
 	exit $?
 }
 
-[ $1 ] || usage
+PROGNAME=`basename $0`
+[ "$PROGNAME" = "showlayers" ] || [ "$1" ] || usage
 SPECS="etc/packages/mount"
 MNTCMD=append 
 [ "$(readlink /sbin/losetup)" = '../bin/busybox' ] && FREELOOP=$(/sbin/losetup -f | tr -d [a-z/]) || FREELOOP=$(/sbin/losetup -a | tail -n1 | cut -b 10-11)
@@ -138,10 +139,7 @@ done
 
 [ "$ACT" = "ins" ] && MNTCMD=""
 [ "$SYSMNT" ] || SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0)
-
-PROGNAME=`basename $0`
 [ "$PROGNAME" = "layermanager" ] || $PROGNAME "$1"
-
 [ "$ACT" = "del" ] && moduledelete $1
 [ "$ACT" = "ins" ] && moduleinstall $1
 [ "$MNTCMD" ] && modulemount $1

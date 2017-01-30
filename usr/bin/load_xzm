@@ -15,7 +15,7 @@ ntf () {
 }
 
 ##Find module
-MOD=$(realpath "$1") || msgerr "No file $1"
+MOD=$(realpath "$1") || ntf -e "No file $1"
 MODNAME=$(basename $MOD)
 ##Check module
 case $(file -b $MOD) in
