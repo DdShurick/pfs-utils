@@ -41,38 +41,41 @@ do
  $sudo kill $Ppid
 done
 
-ntf -i "Идет отключение модуля $MODNAME" &
+ntf -wt "Идет отключение модуля $MODNAME" &
 
 $sudo mount -o remount,del:"$MNTPT"/ /
 
-XRESTART=""
+#XRESTART=""
 
-#- update ld.conf.so (libraries)
-if [ ! -z "`which ldconfig`" ]; then
-	if [ -d  "$MNTPT/usr/lib" -o -d "$MNTPT/usr/local/lib" ]; then
-	 echo "Updating library cache /etc/ld.so.cache..."
-	 ldconfig
-	fi
-fi
-#- update/refesh menus 
-if [ `find "$MNTPT" | grep -ic "desktop$"` -gt 0 ]; then
- fixmenus
-fi
+##- update ld.conf.so (libraries)
+#if [ ! -z "`which ldconfig`" ]; then
+#	if [ -d  "$MNTPT/usr/lib" -o -d "$MNTPT/usr/local/lib" ]; then
+#	 echo "Updating library cache /etc/ld.so.cache..."
+#	 ldconfig
+#	fi
+#fi
+
+##- update/refesh menus 
+#if [ `find "$MNTPT" | grep -ic "desktop$"` -gt 0 ]; then
+# fixmenus
+#fi
 #- make new kernel modules available, must still be loaded when needed
-kernel_version="`uname -r`"
-if [  `find "$MNTPT/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
- echo "Running depmod...."
- depmod
-fi
-#make new fonts available
-for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
-do
-	if [ -d "$MNTPT/$font_dir" ]; then
-	 cd "$font_dir"
-	 `which mkfontscale` .
-	 `which mkfontdir` .
-	fi
-done
+#kernel_version="`uname -r`"
+#if [  `find "$MNTPT/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+# echo "Running depmod...."
+# depmod
+#fi
+##make new fonts available
+#for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+#do
+#	if [ -d "$MNTPT/$font_dir" ]; then
+#	 cd "$font_dir"
+#	 `which mkfontscale` .
+#	 `which mkfontdir` .
+#	fi
+#done
+##--- Post-unload processes ---
+pfs-update-caches $MNTPT
 
 if [ "$MODTYPE" != "dir" ]; then
 $sudo umount -d "$MNTPT" 

@@ -15,33 +15,33 @@ ntf () {
 }
 
 ##Find module
-MOD=$(realpath "$1") || ntf -e "No file $1"
+MOD=$(realpath "$1") || ntf -a "No file $1"
 MODNAME=$(basename $MOD)
 ##Check module
 case $(file -b $MOD) in
 	Squashfs*4.0*) MODTYPE="sfs" ;;
 	Linux*ext*) MODTYPE="ext" ;;
-	*) ntf -e "Неверный формат $MODNAME"; exit 1 ;;
+	*) ntf -a "Неверный формат $MODNAME"; exit 1 ;;
 esac
 ##--Check free loop ---
 if [ "$(/sbin/losetup -f)" = "" ]; then
-	ntf -e "Модуль не может быть подключен.
+	ntf -a "Модуль не может быть подключен.
 	 Нет ни одного свободного устройства обратной связи"
 	exit 1
 fi
 
 ##--Check if module loaded or installed--- 
 if [ "$(grep $MODNAME /sys/fs/aufs/*/br[0-9]*)" != "" ]; then
-	ntf -e " $MODNAME уже подключен."
+	ntf -a " $MODNAME уже подключен."
 	exit 1
 elif [ "$(ls -1 /$SPECS/ | grep $MODNAME)" != "" ]; then
-	ntf -e " $MODNAME уже установленен в систему."
+	ntf -a " $MODNAME уже установленен в систему."
 	exit 1
 fi 
 
 COPY=$(cat $(df /mnt/sda1/219/modules/apulse-5.0.xzm | awk '/dev/ {print $1}' | sed 's|dev|sys/block|;s|[1-9]$|/removable|'))
 
-ntf -i "Идет подключение модуля $fs_name..." &
+ntf -wt "Идет подключение модуля $fs_name..." &
 #if the removable device, copy to tmpfs
 if [ "$COPY" = "1" ]; then
 	cp "$MOD" /$SYSMNT/changes/tmp/
@@ -56,7 +56,7 @@ if [ $status -eq 0 ]; then
 	$sudo mount -o remount,append:$MNTPT/=ro / 
 	status=$?
 	if [ $status -gt 0 ]; then
-		ntf -e "Ошибка! Не union формат файла $1."
+		ntf -a "Ошибка! Не union формат файла $1."
 		$sudo umount $MNTPT
 		$sudo rmdir $MNTPT
 		[ "$COPY" = "1" ] && rm "$MOD"
@@ -69,39 +69,39 @@ else
 	exit 1
 fi
 
-#--- Post-load processes ---
+##--- Post-load processes ---
+pfs-update-caches $MNTPT
+#XRESTART=""
 
-XRESTART=""
-
-#- update ld.conf.so (libraries)
-if [ ! -z "`which ldconfig`" ]; then
-	if [ -d  "$MNTPT/usr/lib" -o -d "$MNTPT/usr/local/lib" ]; then
-	 echo "Обновление library cache /etc/ld.so.cache..."
-	 ldconfig
-	fi
-fi	
-#- update/refesh menus 	
-if [ `find "$MNTPT" | grep -ic "desktop$"` -gt 0 ];then
- fixmenus
-fi
+##- update ld.conf.so (libraries)
+#if [ ! -z "`which ldconfig`" ]; then
+#	if [ -d  "$MNTPT/usr/lib" -o -d "$MNTPT/usr/local/lib" ]; then
+#	 echo "Обновление library cache /etc/ld.so.cache..."
+#	 ldconfig
+#	fi
+#fi	
+##- update/refesh menus 	
+#if [ `find "$MNTPT" | grep -ic "desktop$"` -gt 0 ];then
+# fixmenus
+#fi
 if [ -f "$MNTPT"/start.sh ];then 
  "$MNTPT"/start.sh 
 fi	 	
 #- make new kernel modules available, must still be loaded when needed
-kernel_version="`uname -r`"
-if [  `find "$MNTPT/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
- echo "Запуск depmod...."
- depmod
-fi
-#make new fonts available
-for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
-do
-	if [ -d "$MNTPT/$font_dir" ]; then
-	 cd "$font_dir"
-	 `which mkfontscale` .
-	 `which mkfontdir` .
-	fi		
-done
+#kernel_version="`uname -r`"
+#if [  `find "$MNTPT/lib/modules/$kernel_version" 2>/dev/null | grep -ic "ko$"` -gt 0 ]; then
+# echo "Запуск depmod...."
+# depmod
+#fi
+##make new fonts available
+#for font_dir in "/usr/X11R6/lib/X11/fonts/TTF" "/usr/share/fonts/default/TTF"
+#do
+#	if [ -d "$MNTPT/$font_dir" ]; then
+#	 cd "$font_dir"
+#	 `which mkfontscale` .
+#	 `which mkfontdir` .
+#	fi		
+#done
 
 [ -x /usr/local/bin/refreshDesktopIcons ] && /usr/local/bin/refreshDesktopIcons
 
