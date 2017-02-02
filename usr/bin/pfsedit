@@ -1,0 +1,99 @@
+#!/bin/sh
+## pfsedit.  DdShurick GPL v2 02.02.2017
+usage() {
+	echo "Usage:"
+	echo "	 $0 [key] modulename"
+	echo "keys:"
+	echo "	 -h|-?|--help - this usage"
+	echo "	 -l|list - Show list of packages in module"
+	echo "	 -m|--merge - one|all"
+	echo "	 -p|--path <path> - Path to builddir, if '.' unpack this. Default /tmp"
+	echo "	 -o|--one <name> - To extract a single specified one module"
+	echo "	 -g|--gz|--gzip - Compress gzip, default xz"
+	exit 0
+}
+
+msgerr() {
+	echo $1
+	exit 1
+}
+
+C="-comp xz"
+
+O=$(getopt -l gz,xz,gzip,help,list,merge:,one:,path: -- ghlm:o:p:x $@) || usage
+eval set -- "$O"
+for OPT in $O
+do
+	case "$OPT" in
+	-g|--gz|--gzip) C=""; shift;;
+	-h|-\?|--help) usage; break;;
+	-l|--list) L="yes"; shift;;
+	-m|--merge) [ "$2" = "one" -o "$2" = "all" ] && MERGE="$2" || usage; shift 2;;
+	-o|--one) PACK="$2"; shift 2;;
+	-p|--path) path="$2"; shift 2;;
+#	-x|--xz) C="-comp xz"; shift;;
+	--)	shift; break;;
+	esac
+done
+
+[ "$1" ] || msgerr "Not specified module"
+E=$(echo $1 | sed 's/.*\.//')
+PWD=$(pwd)
+METADIR="etc/packages/mount"
+BASEDIR="$(basename $1)"
+BUILDDIR=$(echo $BASEDIR | tr '.' '_')
+
+PACKS=$(unsquashfs -l "$1" -e /$METADIR | awk -F/ '/mount/ {print $5}' | sort -u)
+[ "$PACKS" ] || msgerr "In module metadata are not"
+[ "$(echo $PACKS | wc -w)" -gt 1 ] || msgerr "The module is not composite"
+
+if [ "$L" = "yes" ]; then
+	echo "$PACKS"
+	exit 0
+fi
+
+[ "$path" ] || path="/tmp"
+
+mkdir $path/$BUILDDIR || msgerr "$BASEDIR  already exists"
+unsquashfs -d $path/$BUILDDIR/$BASEDIR $1 || msgerr "$BASEDIR  already exists"
+
+echo "$PACKS" | grep "$PACK" | while read P
+do
+	unsquashfs -d $path/$BUILDDIR/$P $1 -ef /$METADIR/$P/*
+	cat $path/$BUILDDIR/$P/$METADIR/$P/pfs.files | while read F
+	do
+		mkdir -p $path/$BUILDDIR/${P}$(dirname $F)
+		mv -f $path/$BUILDDIR/${BASEDIR}$F $path/$BUILDDIR/${P}$F
+	done
+	if [ -f $path/$BUILDDIR/$P/$METADIR/$P/pfs.dirs.empty ]; then
+		cat $path/$BUILDDIR/$P/$METADIR/$P/pfs.dirs.empty | while read D
+		do
+			mkdir -p $path/$BUILDDIR/${P}$D ##? права?
+		done
+	fi
+# Открываем в ФМ для редактирования
+	pcmanfm $path/$BUILDDIR/$P #Здесь надо defaultfilemanager, но нету :(
+# Обновляем метадату
+	if [ "$MERGE" ]; then
+		cd $path/$BUILDDIR/$P
+		mkdir -p $METADIR/$P
+		find . ! -type d | cut -b 2- > $METADIR/$P/pfs.files
+		find . -type d | cut -b 2- | while read D
+		do
+			[ "$(grep $D $METADIR/$P/pfs.files)" ] && continue
+			echo $D >> $METADIR/$P/pfs.dirs.empty
+		done
+		cd $PWD
+
+		[ "$MERGE" = "one" ] && mksquashfs $path/$BUILDDIR/$P $path/$BUILDDIR/${P}.$E $C && rm -r $path/$BUILDDIR/$P
+		[ "$MERGE" = "all" ] && cp -a $path/$BUILDDIR/$P/* $path/$BUILDDIR/$BASEDIR/ && rm -r $path/$BUILDDIR/$P
+	fi
+done
+
+#[ "$MERGE" = "all" ]; then
+#	mv $1 ${1}~
+#	mksquashfs $path/$BUILDDIR/$BASEDIR/ $1 $C
+#fi
+#echo "the files are not in metadata:"
+#find $path/$BUILDDIR/$BASEDIR -type f
+
