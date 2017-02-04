@@ -1,14 +1,28 @@
 #!/bin/sh
-## pfsedit.  DdShurick GPL v2 02.02.2017
+## pfsedit.  DdShurick GPL v2 04.02.2017
+usage_ru() {
+	echo "Использовать:"
+	echo "	 $0 [КЛЮЧ] modulename"
+	echo "Ключи:"
+	echo "	 -h|-?|--help - Эта инструкция"
+	echo "	 -s|--show - Показать сптсок пакетов входящих в модуль"
+	echo "	 -m|--merge - one|all"
+	echo "	 -p|--path <путь> - Путь к каталогу сборки, если '.' распаковать здесь. По умолчанию /tmp"
+	echo "	 -o|--one <имя> - Извлечь только один указанный пакет"
+	echo "	 -g|--gz|--gzip - Сжатие gzip, по умолчанию xz"
+	exit 0
+}
+
 usage() {
+	[ "$(locale | grep -m1 ru)" ] && usage_ru
 	echo "Usage:"
-	echo "	 $0 [key] modulename"
-	echo "keys:"
+	echo "	 $0 [OPTION] modulename"
+	echo "Options:"
 	echo "	 -h|-?|--help - this usage"
-	echo "	 -l|list - Show list of packages in module"
+	echo "	 -s|--show - Show list of packages in module"
 	echo "	 -m|--merge - one|all"
 	echo "	 -p|--path <path> - Path to builddir, if '.' unpack this. Default /tmp"
-	echo "	 -o|--one <name> - To extract a single specified one module"
+	echo "	 -o|--one <name> - To extract a single specified one package"
 	echo "	 -g|--gz|--gzip - Compress gzip, default xz"
 	exit 0
 }
@@ -20,14 +34,14 @@ msgerr() {
 
 C="-comp xz"
 
-O=$(getopt -l gz,xz,gzip,help,list,merge:,one:,path: -- ghlm:o:p:x $@) || usage
+O=$(getopt -l gz,xz,gzip,help,show,merge:,one:,path: -- ghm:o:p:sx $@) || usage
 eval set -- "$O"
 for OPT in $O
 do
 	case "$OPT" in
 	-g|--gz|--gzip) C=""; shift;;
 	-h|-\?|--help) usage; break;;
-	-l|--list) L="yes"; shift;;
+	-s|--show) S="yes"; shift;;
 	-m|--merge) [ "$2" = "one" -o "$2" = "all" ] && MERGE="$2" || usage; shift 2;;
 	-o|--one) PACK="$2"; shift 2;;
 	-p|--path) path="$2"; shift 2;;
@@ -47,7 +61,7 @@ PACKS=$(unsquashfs -l "$1" -e /$METADIR | awk -F/ '/mount/ {print $5}' | sort -u
 [ "$PACKS" ] || msgerr "In module metadata are not"
 [ "$(echo $PACKS | wc -w)" -gt 1 ] || msgerr "The module is not composite"
 
-if [ "$L" = "yes" ]; then
+if [ "$S" = "yes" ]; then
 	echo "$PACKS"
 	exit 0
 fi
@@ -72,7 +86,7 @@ do
 		done
 	fi
 # Открываем в ФМ для редактирования
-	pcmanfm $path/$BUILDDIR/$P #Здесь надо defaultfilemanager, но нету :(
+	mc $path/$BUILDDIR/$P #Здесь надо defaultfilemanager, но нету :(
 # Обновляем метадату
 	if [ "$MERGE" ]; then
 		cd $path/$BUILDDIR/$P

@@ -55,11 +55,13 @@ modulemount() {
 	if [ "$MODTYPE" = "dir" ]; then
 		[ "$(df /initrd/changes | egrep '/dev/|tmpfs')" ] || msgerr "Directory in aufs, mount impossible"
 		mount -o remount,$MNTCMD:$MOD/=ro /
+		[ "$LD" = "yes" ] && pfs-update-caches "$MOD"
 	else
 		[ "$(/sbin/losetup -f)" = "" ] && msgerr "No free loops"
 		mkdir -p /$SYSMNT/bundles/$MODNAME
 		mount -o loop $MOD /$SYSMNT/bundles/$MODNAME
 		mount -o remount,$MNTCMD:/$SYSMNT/bundles/$MODNAME/=ro /
+		[ "$LD" = "yes" ] && pfs-update-caches /$SYSMNT/bundles/$MODNAME
 	fi
 	exit $?
 }
@@ -71,6 +73,7 @@ moduleumount() {
 		mount -o remount,del:$MOD/ /
 	else
 		mount -o remount,del:/$SYSMNT/bundles/$MODNAME/ /
+		[ "$LD" = "yes" ] && pfs-update-caches /$SYSMNT/bundles/$MODNAME
 		umount /$SYSMNT/bundles/$MODNAME
 		rmdir /$SYSMNT/bundles/$MODNAME
 	fi
@@ -82,9 +85,10 @@ moduleinstall() {
 	moduletype "$1"
 	if [ "$MODTYPE" = "dir" ]; then
 		if [ ! -f $MOD/$SPECS/$MODNAME/pfs.files ]; then #if there is no list of files
-			find $MOD ! -type d | sed "s|$MOD||" > /$SPECS/$MODNAME/pfs.files
+			find $MOD ! -type d | sed "s|$MOD||" > "$MOD"/$SPECS/$MODNAME/pfs.files
 		fi
 		cp -a "$MOD"/* /
+		[ "$LD" = "yes" ] && pfs-update-caches "$MOD"
 	else
 		[ "$(/sbin/losetup -f)" = "" ] && msgerr "No free loops"
 		mkdir -p /mnt/$MODNAME
@@ -93,6 +97,7 @@ moduleinstall() {
 			find /mnt/$MODNAME ! -type d | sed "s|/mnt/$MODNAME||" > /$SPECS/$MODNAME/pfs.files
 		fi
 		cp -a /mnt/$MODNAME/* /
+		[ "$LD" = "yes" ] && pfs-update-caches /mnt/$MODNAME
 		umount /mnt/$MODNAME
 		rmdir /mnt/$MODNAME
 	fi
@@ -112,6 +117,7 @@ PROGNAME=`basename $0`
 [ "$PROGNAME" = "showlayers" ] || [ "$1" ] || usage
 SPECS="etc/packages/mount"
 MNTCMD=append 
+LD=yes
 [ "$(readlink /sbin/losetup)" = '../bin/busybox' ] && FREELOOP=$(/sbin/losetup -f | tr -d [a-z/]) || FREELOOP=$(/sbin/losetup -a | tail -n1 | cut -b 10-11)
 #FREELOOP=$(/sbin/losetup -f | cut -b10-)
 
