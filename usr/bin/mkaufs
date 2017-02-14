@@ -1,0 +1,15 @@
+#!/bin/sh
+## mkaufs, DdShurick 14.02.2017, GPL v2
+N=$(ls /sys/fs/aufs/ | wc -w) # № для aufs если несколько.
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0 | head -n1)
+mkdir /$SYSMNT/aufs$N /$SYSMNT/bundles$N
+if [ 1 = 1 ];then
+mkdir /$SYSMNT/changes$N
+mount -t tmpfs tmpfs /$SYSMNT/changes$N
+else
+mkdir /$DEV/$MODULENAME
+ln -s /$DEV/$MODULENAME /$SYSMNT/changes$N
+fi
+mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs /$SYSMNT/aufs$N
+# Переменные ->
+
