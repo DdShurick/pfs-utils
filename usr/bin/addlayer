@@ -1,0 +1,57 @@
+#!/bin/sh
+## addlayer, DdShurick 15.02.2017, GPL v2.
+
+usage () {
+	if [ "$1" ]; then
+		echo "$0: $1"
+		exit 1
+	else
+		echo "Использовать: addlayer -n|--num [1-9] module"
+		echo " ключ -n обязателен, num - № временной aufs если их несколько."
+		echo " Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
+	fi
+	exit 0
+}
+
+[ "$(id -u)" = 0 ] || usage "Разрешено только root"
+[ "$#" -lt 3 ] && usage
+
+O=$(getopt -l help,num: -- hn: $@) || usage
+eval set -- "$O"
+for OPT in $O
+do
+	case "$OPT" in
+	 -n|--num) N=$2; shift 2;;
+	 -h|--help) usage; break;;
+	 --) shift;;
+	esac
+done
+
+[ "$1" ] || usage "Не указан модуль"
+
+for SI_ in $(ls /sys/fs/aufs)
+	do
+		grep changes$N /sys/fs/aufs/$SI_/br0 >/dev/null || continue
+	done
+	
+[ "$SI_" ] || usage "aufs с таким № не существует"
+echo $SI_
+
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/$SI_/br0)
+NEWLAYER=$(realpath $1)
+MODNAME=$(basename $NEWLAYER)
+
+case $(file -b $NEWLAYER) in
+	*directory) MODTYPE="dir" ;;
+	Squashfs*4.0*|Linux*ext*) MODTYPE="sfs"
+		mkdir /$SYSMNT/bundles/$MODNAME
+		mount -o loop $NEWLAYER /$SYSMNT/bundles/$MODNAME
+		NEWLAYER=/$SYSMNT/bundles/$MODNAME
+	;;
+	"") usage "Missing modulename" ;;
+	*) usage "Invalid format $MODNAME" ;;
+esac
+
+echo $MODTYPE
+
+mount -o remount,add:1:$NEWLAYER /$SYSMNT/aufs$N || usage "Ошибка монтирования"

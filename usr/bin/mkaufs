@@ -1,5 +1,5 @@
 #!/bin/sh
-## mkaufs, DdShurick 14.02.2017, GPL v2
+## mkaufs, DdShurick 14.02.2017, GPL v2. The idea of betcher.
 usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
@@ -36,7 +36,7 @@ else
 	usage
 fi
 
-mkdir /$SYSMNT/aufs$N /$SYSMNT/bundles$N
+mkdir /$SYSMNT/aufs$N
 mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs /$SYSMNT/aufs$N
 # Переменные -> какие и куда?
 # Сообщения - какие?
