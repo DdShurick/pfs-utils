@@ -1,33 +1,37 @@
 #!/bin/sh
-## addlayer, DdShurick 15.02.2017, GPL v2.
+## addlayer, DdShurick 16.02.2017, GPL v2.
 
 usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
 		exit 1
 	else
-		echo "Использовать: addlayer -n|--num [1-9] module"
-		echo " ключ -n обязателен, num - № временной aufs если их несколько."
-		echo " Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
+		echo "Использовать: addlayer [0-9] module"
+#		echo ""
+		echo "Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
 	fi
 	exit 0
 }
 
+[ "$1" = "" -o "$1" = "-h" -o "$1" = "--help" ] && usage
 [ "$(id -u)" = 0 ] || usage "Разрешено только root"
-[ "$#" -lt 3 ] && usage
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0 | head -n1)
 
-O=$(getopt -l help,num: -- hn: $@) || usage
-eval set -- "$O"
-for OPT in $O
-do
-	case "$OPT" in
-	 -n|--num) N=$2; shift 2;;
-	 -h|--help) usage; break;;
-	 --) shift;;
-	esac
-done
+case "$1" in
+	0) AUFSMNT="/"; shift;;
+	[1-9]) N=$1
+		if [ $N -lt $(ls /sys/fs/aufs | wc -w) ]; then
+			AUFSMNT=/$SYSMNT/aufs$N
+			shift
+		else
+			usage "aufs с таким № нет"
+		fi
+	;;
+	*) AUFSMNT="/" ;;
+esac
 
-[ "$1" ] || usage "Не указан модуль"
+NEWLAYER=$(realpath $1) || usage "Файл не найден"
+MODNAME=$(basename $NEWLAYER)
 
 for SI_ in $(ls /sys/fs/aufs)
 	do
@@ -35,11 +39,6 @@ for SI_ in $(ls /sys/fs/aufs)
 	done
 	
 [ "$SI_" ] || usage "aufs с таким № не существует"
-echo $SI_
-
-SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/$SI_/br0)
-NEWLAYER=$(realpath $1)
-MODNAME=$(basename $NEWLAYER)
 
 case $(file -b $NEWLAYER) in
 	*directory) MODTYPE="dir" ;;
@@ -52,6 +51,6 @@ case $(file -b $NEWLAYER) in
 	*) usage "Invalid format $MODNAME" ;;
 esac
 
-echo $MODTYPE
+mount -o remount,add:1:$NEWLAYER $AUFSMNT || usage "Ошибка монтирования"
 
-mount -o remount,add:1:$NEWLAYER /$SYSMNT/aufs$N || usage "Ошибка монтирования"
+[ "$AUFSMNT" = "/" ] || echo "aufs смонтирована в $AUFSMNT, сохранение изменений /$SYSMNT/changes$N"
