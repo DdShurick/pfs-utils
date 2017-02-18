@@ -5,11 +5,10 @@ usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
 		exit 1
-	else
-		echo "Использовать: addlayer [0-9] module"
-#		echo ""
-		echo "Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
 	fi
+	echo "Использовать: addlayer [0-9] module"
+#	echo ""
+	echo "Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
 	exit 0
 }
 
@@ -43,7 +42,7 @@ for SI_ in $(ls /sys/fs/aufs)
 case $(file -b $NEWLAYER) in
 	*directory) MODTYPE="dir" ;;
 	Squashfs*4.0*|Linux*ext*) MODTYPE="sfs"
-		mkdir /$SYSMNT/bundles$N/$MODNAME
+		mkdir -p /$SYSMNT/bundles$N/$MODNAME
 		mount -o loop $NEWLAYER /$SYSMNT/bundles$N/$MODNAME
 		NEWLAYER=/$SYSMNT/bundles$N/$MODNAME
 	;;
