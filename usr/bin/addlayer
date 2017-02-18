@@ -43,9 +43,9 @@ for SI_ in $(ls /sys/fs/aufs)
 case $(file -b $NEWLAYER) in
 	*directory) MODTYPE="dir" ;;
 	Squashfs*4.0*|Linux*ext*) MODTYPE="sfs"
-		mkdir /$SYSMNT/bundles/$MODNAME
-		mount -o loop $NEWLAYER /$SYSMNT/bundles/$MODNAME
-		NEWLAYER=/$SYSMNT/bundles/$MODNAME
+		mkdir /$SYSMNT/bundles$N/$MODNAME
+		mount -o loop $NEWLAYER /$SYSMNT/bundles$N/$MODNAME
+		NEWLAYER=/$SYSMNT/bundles$N/$MODNAME
 	;;
 	"") usage "Missing modulename" ;;
 	*) usage "Invalid format $MODNAME" ;;
