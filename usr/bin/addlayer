@@ -1,18 +1,22 @@
 #!/bin/sh
 ## addlayer, DdShurick 16.02.2017, GPL v2.
-
+##170220, sfs wrote usage.
 usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
 		exit 1
 	fi
-	echo "Использовать: addlayer [0-9] module"
-#	echo ""
-	echo "Модуль может быть squashfs, файл с внутренней ФС ext и каталог."
+	echo "Usage: addlayer n x"
+	echo "	Монтирование x в n временный слой AUFS"
+	echo "	n: [0-9] номер слоя aufs, созданного mkaufs"
+	echo "	x: squashfs, файл с внутренней ФС ext или каталог."
 	exit 0
 }
 
 [ "$1" = "" -o "$1" = "-h" -o "$1" = "--help" ] && usage
+[ "$(df "$2" | egrep 'aufs|unionfs')" ] && usage "Ошибка!
+    '$2' находится на разделе с aufs. 
+    Переместите на раздел с другой файловой системой."
 [ "$(id -u)" = 0 ] || usage "Разрешено только root"
 SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0 | head -n1)
 
