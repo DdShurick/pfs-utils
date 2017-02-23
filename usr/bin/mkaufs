@@ -16,16 +16,16 @@ usage () {
 [ "$(id -u)" = 0 ] || usage "Разрешено только root"
 
 N=$(ls /sys/fs/aufs/ | wc -w) # № для aufs если несколько.
-SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_*/br0 | head -n1)
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
 
 if [ $# = 0 ]; then
 	mkdir /$SYSMNT/changes$N
 	mount -t tmpfs tmpfs /$SYSMNT/changes$N
 elif [ $# = 2 ]; then
-	MNTPT="$(grep $1 /proc/mounts | awk '{print $2}')" 
-	[ "$(grep $1 /proc/partitions | wc -l)" = 1 ] || usage "Такого раздела не существует"
-	[ "$(blkid /dev/$1 | grep ext)" ] || usage "ФС не Linux"
+	MNTPT="$(grep $1 /proc/mounts | awk '{print $2}')"
 	if [ "$MNTPT" = "" ]; then
+		[ "$(grep $1 /proc/partitions)" ] || usage "Такого раздела не существует"
+		[ "$(blkid $DEV | grep ext)" ] || usage "ФС не Linux"
 		MNTPT=/mnt/$1
 		mkdir $MNTPT
 		mount /dev/$1 $MNTPT
@@ -38,5 +38,5 @@ fi
 
 mkdir /$SYSMNT/aufs$N
 mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs /$SYSMNT/aufs$N
-# Переменные -> какие и куда?
-# Сообщения - какие?
+
+echo "Создана aufs с корнем /$SYSMNT/aufs$N"
