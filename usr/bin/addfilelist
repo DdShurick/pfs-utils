@@ -1,0 +1,18 @@
+#!/bin/sh
+## addfilelist, DdShurick 24.02.2017, GPL v2.
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0 | head -n1)
+SI=$(grep aufs$N /proc/mounts | cut -f2 -d= | cut -f1 -d' ')
+#NAMES список модулей для перезаписи списка файлов через пробел запятую
+NAMES=$(echo "$@" | tr ' ,' '|')
+cut -f1 -d= /sys/fs/aufs/si_$SI/br[1-9]* | egrep "$NAMES" | while read P
+do
+#	[ -d $P/etc/packages/mount ] && continue
+	cd $P
+	NAME=$(basename $P | sed 's/\....$//')
+	M=/$SYSMNT/aufs$N/etc/packages/mount/$NAME
+	mkdir -p $M
+	echo "name=\"$NAME\"" > $M/pfs.specs
+	find . -type d -empty | cut -b2- > $M/pfs.dirs.empty
+	[ -s $M/pfs.dirs.empty ] || rm $M/pfs.dirs.empty
+	find . ! -type d | cut -b2- > $M/pfs.files
+done
