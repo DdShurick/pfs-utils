@@ -1,22 +1,39 @@
 #!/bin/sh
-## mkaufs, DdShurick 14.02.2017, GPL v2. The idea of betcher.
+## mkaufs, DdShurick 28.02.2017, GPL v2. The idea of betcher.
 usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
 	else
 		echo "Использовать:"
-		echo "	$0 - изменения сохраняются в tmpfs"
-		echo "	$0 <раздел> <каталог> - изменения сохраняются в каталог на указанном разделе"
-		echo "		раздел - \"home|sd[a-f][1-9]*\""
-		echo "		каталог - любое имя без пробела"
+		echo " $0 [-r|--root dir] - изменения сохраняются в tmpfs"
+		echo " $0 [-r|--root dir] <раздел> <каталог> - изменения сохраняются в 
+  каталог на указанном разделе"
+		echo " -r|--root указать корень создаваемой aufs, по умолчанию /$SYSMNT/aufs$N"
+		echo "  раздел - \"sd[a-f][1-9]*\""
+		echo "  каталог - любое имя без пробела"
 	fi
 	exit 0
 }
 
-[ "$(id -u)" = 0 ] || usage "Разрешено только root"
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
+#AUFSROOT="/"
 
 N=$(ls /sys/fs/aufs/ | wc -w) # № для aufs если несколько.
-SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
+AUFSROOT="/$SYSMNT/aufs$N"
+
+O=$(getopt -l help,root: -- hr: $@) || usage
+eval set -- "$O"
+for OPT in $O
+do
+	case "$OPT" in
+	-h|--help) usage; break;;
+	-r|--root) AUFSROOT="$2"
+		shift 2;;
+	--)	shift; break;;
+	esac
+done
+
+[ "$(id -u)" = 0 ] || usage "Разрешено только root"
 
 if [ $# = 0 ]; then
 	mkdir /$SYSMNT/changes$N
@@ -36,7 +53,8 @@ else
 	usage
 fi
 
-mkdir /$SYSMNT/aufs$N
-mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs /$SYSMNT/aufs$N
+mkdir -p $AUFSROOT
+mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs "$AUFSROOT"
 
-echo "Создана aufs с корнем /$SYSMNT/aufs$N"
+echo "$AUFSROOT" > /tmp/aufs$N
+aufs-tray $N "$AUFSROOT" &

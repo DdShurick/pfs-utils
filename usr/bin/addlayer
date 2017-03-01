@@ -15,6 +15,7 @@ usage () {
 
 [ "$1" = "" -o "$2" = "" -o "$1" = "-h" -o "$1" = "--help" ] && usage
 [ "$(id -u)" = 0 ] || usage "Разрешено только root"
+#[ "$2" ] || 
 NEWLAYER=$(realpath "$2") || usage "Файл не найден"
 [ "$(df "$NEWLAYER" | egrep '^aufs|^unionfs')" ] && usage "Ошибка!
     '$2' находится на разделе с aufs. 
