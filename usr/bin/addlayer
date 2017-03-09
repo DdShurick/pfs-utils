@@ -6,37 +6,43 @@ usage () {
 		echo "$0: $1"
 		exit 1
 	fi
-	echo "Usage: addlayer n x"
-	echo "	Монтирование x в n временный слой AUFS"
+	echo "Usage: addlayer [n x]"
+	echo "	Монтирование x во временный слой AUFS n"
 	echo "	n: [0-9] номер слоя aufs, созданного mkaufs"
 	echo "	x: squashfs, файл с внутренней ФС ext или каталог."
 	exit 0
 }
 
-[ "$1" = "" -o "$2" = "" -o "$1" = "-h" -o "$1" = "--help" ] && usage
-[ "$(id -u)" = 0 ] || usage "Разрешено только root"
-#[ "$2" ] || 
-NEWLAYER=$(realpath "$2") || usage "Файл не найден"
-[ "$(df "$NEWLAYER" | egrep '^aufs|^unionfs')" ] && usage "Ошибка!
-    '$2' находится на разделе с aufs. 
-    Переместите на раздел с другой файловой системой."
-SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
-AUFSMNT="/"
-
 case "$1" in
-	0) shift;;
-	[1-9]) N=$1
-		if [ $N -lt $(ls -d /sys/fs/aufs/si_* | wc -w) ]; then
-			AUFSMNT=/$SYSMNT/aufs$N
+	-h|--help|"") usage;;
+	[0-9]) [ "$(id -u)" = 0 ] || usage "Разрешено только root"
+		N=$1
+		if [ -f /tmp/aufs$N ]; then 
+			AUFSROOT=$(cat /tmp/aufs$N)
 			shift
 		else
-			usage "aufs с таким № нет"
+			usage "aufs №$N нет"
 		fi
 	;;
-	*) usage "Неверный аргумент"
+	*) [ "$(id -u)" = 0 ] || usage "Разрешено только root"
+		[ "$(ls -d /sys/fs/aufs/si_* | wc -w)" = 1 ] && mkaufs
+		if [ $(ls /tmp/aufs* | wc -w) = 1 ]; then
+			N=$(ls /tmp/aufs* | tr -d [a-z/])
+		else
+			echo "Выберите № aufs из:"
+			ls /tmp/aufs* | tr -d [a-z/]
+			echo -n "Напечатайте выбранный №:"
+			read N
+		fi
+	;;
 esac
 
-[ "$(grep aufs$N /proc/mounts)" ] || usage "aufs с таким № не существует"
+NEWLAYER=$(realpath "$1") || usage "Файл не найден"
+[ "$(df "$NEWLAYER" | egrep '^aufs|^unionfs')" ] && usage "Ошибка!
+    '$1' находится на разделе с aufs. 
+    Переместите на раздел с другой файловой системой."
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
+AUFSROOT="$(cat /tmp/aufs$N)"
 MODNAME=$(basename "$NEWLAYER")
 
 case $(file -b $NEWLAYER) in
@@ -50,6 +56,6 @@ case $(file -b $NEWLAYER) in
 	*) usage "Invalid format $MODNAME" ;;
 esac
 
-mount -o remount,add:1:"$NEWLAYER" $AUFSMNT || usage "Ошибка монтирования"
+mount -o remount,add:1:"$NEWLAYER" $AUFSROOT || usage "Ошибка монтирования"
 
-[ "$AUFSMNT" = "/" ] || echo "Корень aufs №$N $AUFSMNT, сохранение изменений /$SYSMNT/changes$N"
+[ "$AUFSMNT" = "/" ] || echo "Корень aufs №$N $AUFSROOT, сохранение изменений /$SYSMNT/changes$N"

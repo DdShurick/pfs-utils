@@ -57,4 +57,4 @@ mkdir -p $AUFSROOT
 mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs "$AUFSROOT"
 
 echo "$AUFSROOT" > /tmp/aufs$N
-aufs-tray $N "$AUFSROOT" &
+#aufs-tray $N "$AUFSROOT" &
