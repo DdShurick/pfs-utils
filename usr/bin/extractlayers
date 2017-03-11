@@ -1,0 +1,63 @@
+#!/bin/sh
+## extractlayers, DdShurick 11.03.2017, GPL v2.
+usage () {
+	if [ "$1" ]; then
+		echo "$0: $1"
+		exit 1
+	fi
+	echo "Usage: extractlayers [-o outdir] <dir|module>"
+	echo "	outdir по умолчанию '.' "
+	echo "	dir - каталог для разборки"
+	echo "	module - squashfs модуль для разборки"
+	exit 0
+}
+
+OUTDIR="."
+
+O=$(getopt -l help -- n:o: $@) || usage
+eval set -- "$O"
+for OPT in $O
+do
+	case "$OPT" in
+	-h|--help) usage; break;;
+	-n) N=$2; shift 2;;
+	-o) OUTDIR="realpath $2" || usage "Неверно задан выходной каталог"
+		shift 2;;
+	--)	shift; break;;
+	esac
+done
+
+[ "$1" ] || usage
+NEWLAYER=$(realpath "$1") || usage "$NEWLAYER не найден"
+[ "$(id -u)" = 0 ] || usage "Разрешено только root"
+mkdir -p $OUTDIR
+
+SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
+
+DATA=$(ls -1 $NEWLAYER/etc/packages/mount) || echo "$L: Извлечение невозможно, отсутствует список пакетов"
+echo "Выберите пакеты для извлечения:"
+echo "$DATA"
+echo "Несколько пакетов разделять | (packone|packtwo)"
+echo "Если просто нажать Enter, будут извлечены все"
+echo ""
+read P
+echo "$DATA" | egrep "$P" | while read D
+do
+	mkaufs
+	N=$?
+	AUFSROOT=$(cat /var/lock/aufs$N)
+	addlayer $N $NEWLAYER
+#L=$(cat /sys/fs/aufs/si_$(grep aufs$N /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br[1-9]* | cut -f1 -d\=)
+	mkdir -p $OUTDIR/$D
+		[ -f $NEWLAYER/etc/packages/mount/$D/pfs.dirs.empty ] && cat $NEWLAYER/etc/packages/mount/$D/pfs.dirs.empty | while read d
+		do
+			cp -a ${NEWLAYER}$d ${AUFSROOT}$d
+		done
+		cat $NEWLAYER/etc/packages/mount/$D/pfs.files | while read F
+		do
+			cp -a ${NEWLAYER}$F ${AUFSROOT}$F
+		done
+		mv /$SYSMNT/changes$N/* $OUTDIR/$D/
+	delaufs $N
+done
+

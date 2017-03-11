@@ -1,5 +1,5 @@
 #!/bin/sh
-## delaufs, DdShurick 18.02.2017, GPL v2.
+## delaufs, DdShurick 11.03.2017, GPL v2.
 usage() {
 	if [ "$1" ]; then
 		echo "$0: $1"
@@ -12,9 +12,9 @@ usage() {
 
 [ "$1" = "" -o "$1" = "-h" -o "$1" = "--help" ] && usage
 [ "$(id -u)" = 0 ] || usage "Разрешено только root"
-[ -f /tmp/aufs$1 ] || usage "Неправильный аргумент"
+[ -f /var/lock/aufs$1 ] || usage "aufs №$1 не существует"
 SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
-AUFSROOT="$(cat /tmp/aufs$1)" && rm /tmp/aufs$1
+AUFSROOT="$(cat /var/lock/aufs$1)"
 
 umount "$AUFSROOT"
 rmdir "$AUFSROOT" 2>/dev/null
@@ -34,3 +34,4 @@ if [ -d /$SYSMNT/bundles$1 ]; then
 	done
 	 rmdir /$SYSMNT/bundles$1
 fi
+[ -d "$AUFSROOT" -o -d "/$SYSMNT/changes$1" -o -d "/$SYSMNT/bundles$1" ] || rm /var/lock/aufs$1

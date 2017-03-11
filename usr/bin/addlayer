@@ -1,5 +1,5 @@
 #!/bin/sh
-## addlayer, DdShurick 16.02.2017, GPL v2.
+## addlayer, DdShurick 09.03.2017, GPL v2.
 ##170220, sfs wrote usage.
 usage () {
 	if [ "$1" ]; then
@@ -17,8 +17,8 @@ case "$1" in
 	-h|--help|"") usage;;
 	[0-9]) [ "$(id -u)" = 0 ] || usage "Разрешено только root"
 		N=$1
-		if [ -f /tmp/aufs$N ]; then 
-			AUFSROOT=$(cat /tmp/aufs$N)
+		if [ -f /var/lock/aufs$N ]; then 
+			AUFSROOT=$(cat /var/lock/aufs$N)
 			shift
 		else
 			usage "aufs №$N нет"
@@ -26,23 +26,23 @@ case "$1" in
 	;;
 	*) [ "$(id -u)" = 0 ] || usage "Разрешено только root"
 		[ "$(ls -d /sys/fs/aufs/si_* | wc -w)" = 1 ] && mkaufs
-		if [ $(ls /tmp/aufs* | wc -w) = 1 ]; then
-			N=$(ls /tmp/aufs* | tr -d [a-z/])
+		if [ $(ls /var/lock/aufs* | wc -w) = 1 ]; then
+			N=$(ls /var/lock/aufs* | tr -d [a-z/])
 		else
 			echo "Выберите № aufs из:"
-			ls /tmp/aufs* | tr -d [a-z/]
+			ls /var/lock/aufs* | tr -d [a-z/]
 			echo -n "Напечатайте выбранный №:"
 			read N
 		fi
 	;;
 esac
 
-NEWLAYER=$(realpath "$1") || usage "Файл не найден"
+NEWLAYER=$(realpath "$1") || usage "$NEWLAYER не найден"
 [ "$(df "$NEWLAYER" | egrep '^aufs|^unionfs')" ] && usage "Ошибка!
     '$1' находится на разделе с aufs. 
     Переместите на раздел с другой файловой системой."
 SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
-AUFSROOT="$(cat /tmp/aufs$N)"
+AUFSROOT="$(cat /var/lock/aufs$N)"
 MODNAME=$(basename "$NEWLAYER")
 
 case $(file -b $NEWLAYER) in
@@ -58,4 +58,4 @@ esac
 
 mount -o remount,add:1:"$NEWLAYER" $AUFSROOT || usage "Ошибка монтирования"
 
-[ "$AUFSMNT" = "/" ] || echo "Корень aufs №$N $AUFSROOT, сохранение изменений /$SYSMNT/changes$N"
+echo "Корень aufs №$N $AUFSROOT, сохранение изменений /$SYSMNT/changes$N"

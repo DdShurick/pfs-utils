@@ -1,5 +1,5 @@
 #!/bin/sh
-## mkaufs, DdShurick 28.02.2017, GPL v2. The idea of betcher.
+## mkaufs, DdShurick 11.03.2017, GPL v2. The idea of betcher.
 usage () {
 	if [ "$1" ]; then
 		echo "$0: $1"
@@ -17,7 +17,7 @@ usage () {
 
 SYSMNT=$(cut -f2 -d/ /sys/fs/aufs/si_$(grep ' / aufs' /proc/mounts | cut -f2 -d= | tr ',' ' ' | cut -f1 -d' ')/br0)
 #Ищем первую свободную
-for N in $(seq 10); do [ -f /tmp/aufs$N ] || break; done
+for N in $(seq 10); do [ -f /var/lock/aufs$N ] || break; done
 
 AUFSROOT="/$SYSMNT/aufs$N"
 
@@ -56,5 +56,6 @@ fi
 mkdir -p $AUFSROOT
 mount -t aufs -o dirs=/$SYSMNT/changes$N/=rw aufs "$AUFSROOT"
 
-echo "$AUFSROOT" > /tmp/aufs$N
+echo "$AUFSROOT" > /var/lock/aufs$N
 #aufs-tray $N "$AUFSROOT" &
+exit $N
