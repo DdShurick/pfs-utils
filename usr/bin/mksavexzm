@@ -1,21 +1,26 @@
 #!/bin/sh
-# DdShurick GPL-v2 18.03.16 for Richy initrd_mnt
+# DdShurick GPL-v2 18.03.16 
+# DdShurick changed for Richy minitrd 15.07.19
 if [ "$(id -u)" != 0 ]; then
 loginroot $0
 exit
 fi
 #Задаём переменные
+[ $(grep "DISTRO_FILE_PREFIX" /etc/initvars) ] || echo "DISTRO_FILE_PREFIX='$(losetup -a|awk '/-base./ {print $3}'|sed 's|.*/base/||;s|-base.*||;')'" >> /etc/initvars
 . /etc/initvars
-SAVEPATH=/mnt/${PDEV}${PDIR}/base
+SAVEPATH=/mnt/${PDEV}/${PDIR}/base
+#SAVEPATH=$(busybox losetup -a|awk '/base/ {print $3}'|sed 's/base.*//'|sort -u)
 
-[ "$(grep $PDEV /proc/mounts)" ] || mount /dev/$PDEV /mnt/$PDEV
-[ -d /mnt/${PDEV}${PDIR}/changes ] && SYSMNT=mnt/${PDEV}${PDIR}
-#Последовательно копируем 2 1 0 слои
+#[ "$(grep $PDEV /proc/mounts)" ] || mount /dev/$PDEV /mnt/$PDEV
+[ -d ${SAVEPATH}changes ] && SYSMNT=mnt/${PDEV}/${PDIR}
+#Последовательно копируем слои
 mkdir -p /tmp/savesfs-root
-[ "$(grep "save_sq " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_sq/* /tmp/savesfs-root/
-[ "$(grep "save_ext " /proc/mounts)" ] && cp -a /$SYSMNT/bundles/save_ext/* /tmp/savesfs-root/
-cp -a $(ls -d /$SYSMNT/changes/[!dimstv]*) /tmp/savesfs-root/
-#[ "$SYSMNT" = "mnt/${PDEV}${PDIR}" ] && rm -r /$SYSMNT/changes
+SAVE=$(awk '/save/ {print $2}' /proc/mounts) #/upd/
+[ "$SAVE" ] && cp -af $SAVE/* /tmp/savesfs-root/
+CHANGES=$(awk '/changes/ {print $2}' /proc/mounts)
+cp -af $(ls -d $CHANGES/[!dimstv]*) /tmp/savesfs-root/
+#Удаляем каталог сохранения
+[ "$SYSMNT" = "mnt/${PDEV}${PDIR}" ] && rm -r /$SYSMNT/changes
 echo false > /tmp/savesfs-root/etc/.XLOADED
 #Удаляем "затенённые" (отмеченные как удалённые) файлы и каталоги.
 find /tmp/savesfs-root -mindepth 2 -name .wh.* | while read WH
@@ -27,11 +32,7 @@ F=$(echo $WH | sed 's/\/tmp\/savesfs-root//;s/.wh.//g')
 	 [ -e "/tmp/savesfs-root$F" ] && rm -r /tmp/savesfs-root$F #если ранее сохранённый файл удалён, удаляем его.
 	fi # если .wh.* относится к нижним слоям - ничего не делаем
 done
-#sfs_code
-#for i in `find /tmp/makesfs -name ".wh.*"` ;do
-#    i2="`dirname "$i"`/`basename "$i" |sed 's/.wh.//`"
-#    [ `stat -c %Y "$i2"` -gt `stat -c %Y "$i"` ] || rm "$i"
-#done
+#Бекапим файл сохранения
+[ -f $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm ] && mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm.old
 #Создаём новый файл сохранения
-mv $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm.old
 mksquashfs /tmp/savesfs-root/ $SAVEPATH/${DISTRO_FILE_PREFIX}-save.xzm -comp xz && rm -r /tmp/savesfs-root
